@@ -1,0 +1,314 @@
+{
+  "name": "dependency-visualizer",
+  "displayName": "Cross-Language Dependency Visualizer",
+  "description": "Visualize dependencies for Java and C/C++ projects with conflict detection",
+  "version": "1.0.0",
+  "engines": {
+    "vscode": "^1.74.0"
+  },
+  "categories": ["Other"],
+  "activationEvents": [
+    "onLanguage:java",
+    "onLanguage:cpp",
+    "onLanguage:c",
+    "onCommand:extension.convertToConstants"
+  ],
+  "main": "./out/extension.js",
+  "contributes": {
+    "viewsContainers": {
+      "activitybar": [
+        {
+          "id": "dependencyVisualizer",
+          "title": "Dependency Visualizer",
+          "icon": "$(type-hierarchy-sub)"
+        }
+      ]
+    },
+    "views": {
+      "dependencyVisualizer": [
+        {
+          "type": "webview",
+          "id": "dependencyVisualizerDashboard",
+          "name": "Control Panel",
+          "when": "dependencyVisualizer.hasProjects"
+        },
+        {
+          "id": "enhancedFileConnectionsList",
+          "name": "Java-C++ Connections",
+          "when": "dependencyVisualizer.hasProjects"
+        },
+        {
+          "id": "constantsList",
+          "name": "Project Constants",
+          "when": "dependencyVisualizer.hasProjects"
+        },
+        {
+          "id": "connectionStatistics",
+          "name": "Statistics",
+          "when": "dependencyVisualizer.hasProjects"
+        }
+      ],
+      "explorer": [
+        {
+          "id": "dependencyTree",
+          "name": "Dependencies",
+          "when": "dependencyVisualizer.hasProjects"
+        }
+      ]
+    },
+    "commands": [
+      {
+        "command": "dependencyVisualizer.analyzeDependencies",
+        "title": "Analyze Dependencies",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.showDependencyGraph",
+        "title": "Show Dependency Graph",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.refreshDependencies",
+        "title": "Refresh Dependencies",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.refactor",
+        "title": "Refactor Code",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.rename",
+        "title": "Rename Symbol",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.moveNativeMethod",
+        "title": "Move Native Method",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.extractConstant",
+        "title": "Extract Constant",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.openFile",
+        "title": "Open File",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.refreshAll",
+        "title": "Refresh All Data",
+        "category": "Dependency Visualizer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dependencyVisualizer.showConnectionStats",
+        "title": "Show Connection Statistics",
+        "category": "Dependency Visualizer",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "dependencyVisualizer.searchConnections",
+        "title": "Search Connections",
+        "category": "Dependency Visualizer",
+        "icon": "$(search)"
+      },
+      {
+        "command": "dependencyVisualizer.filterConnections",
+        "title": "Filter Connections",
+        "category": "Dependency Visualizer",
+        "icon": "$(filter)"
+      },
+      {
+        "command": "dependencyVisualizer.groupConnectionsBy",
+        "title": "Group Connections",
+        "category": "Dependency Visualizer",
+        "icon": "$(group-by-ref-type)"
+      },
+      {
+        "command": "dependencyVisualizer.generateCppStub",
+        "title": "Generate C++ Stub",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.showFileConnectionsList",
+        "title": "Show Java-C++ File Connections",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.refreshConnections",
+        "title": "Refresh Connections",
+        "category": "Dependency Visualizer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dependencyVisualizer.showConstantsStats",
+        "title": "Show Constants Statistics",
+        "category": "Dependency Visualizer",
+        "icon": "$(graph)"
+      },
+      {
+        "command": "dependencyVisualizer.searchConstants",
+        "title": "Search Constants",
+        "category": "Dependency Visualizer",
+        "icon": "$(search)"
+      },
+      {
+        "command": "dependencyVisualizer.groupConstants",
+        "title": "Group Constants",
+        "category": "Dependency Visualizer",
+        "icon": "$(group-by-ref-type)"
+      },
+      {
+        "command": "dependencyVisualizer.toggleSuggestionsOnly",
+        "title": "Toggle Suggestions Only",
+        "category": "Dependency Visualizer",
+        "icon": "$(lightbulb)"
+      },
+      {
+        "command": "dependencyVisualizer.refreshConstants",
+        "title": "Refresh Constants",
+        "category": "Dependency Visualizer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dependencyVisualizer.goToConstant",
+        "title": "Go to Constant",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.applySuggestion",
+        "title": "Apply Suggestion",
+        "category": "Dependency Visualizer"
+      },
+      {
+        "command": "extension.convertToConstants",
+        "title": "Refactor: Convert Magic Numbers to Constants",
+        "category": "Dependency Visualizer"
+      }
+    ],
+    "keybindings": [
+      {
+        "command": "dependencyVisualizer.refactor",
+        "key": "ctrl+shift+r",
+        "when": "editorTextFocus"
+      },
+      {
+        "command": "dependencyVisualizer.rename",
+        "key": "f2",
+        "when": "editorTextFocus"
+      }
+    ],
+    "menus": {
+      "editor/context": [
+        {
+          "command": "dependencyVisualizer.refactor",
+          "group": "1_modification",
+          "when": "resourceLangId == java || resourceLangId == cpp"
+        },
+        {
+          "command": "dependencyVisualizer.moveNativeMethod",
+          "group": "1_modification",
+          "when": "editorTextFocus && resourceLangId == java"
+        }
+      ],
+      "view/title": [
+        {
+          "command": "dependencyVisualizer.showConstantsStats",
+          "when": "view == constantsList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dependencyVisualizer.searchConstants",
+          "when": "view == constantsList",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dependencyVisualizer.groupConstants",
+          "when": "view == constantsList",
+          "group": "navigation@3"
+        },
+        {
+          "command": "dependencyVisualizer.toggleSuggestionsOnly",
+          "when": "view == constantsList",
+          "group": "navigation@4"
+        },
+        {
+          "command": "dependencyVisualizer.refreshConstants",
+          "when": "view == constantsList",
+          "group": "navigation@5"
+        },
+        {
+          "command": "dependencyVisualizer.showConnectionStats",
+          "when": "view == enhancedFileConnectionsList",
+          "group": "navigation@1"
+        },
+        {
+          "command": "dependencyVisualizer.searchConnections",
+          "when": "view == enhancedFileConnectionsList",
+          "group": "navigation@2"
+        },
+        {
+          "command": "dependencyVisualizer.filterConnections",
+          "when": "view == enhancedFileConnectionsList",
+          "group": "navigation@3"
+        },
+        {
+          "command": "dependencyVisualizer.groupConnectionsBy",
+          "when": "view == enhancedFileConnectionsList",
+          "group": "navigation@4"
+        },
+        {
+          "command": "dependencyVisualizer.refreshAll",
+          "when": "view == enhancedFileConnectionsList",
+          "group": "navigation@5"
+        }
+      ],
+      "view/item/context": [
+        {
+          "command": "dependencyVisualizer.generateCppStub",
+          "when": "view == enhancedFileConnectionsList && viewItem == missingConnection",
+          "group": "inline"
+        },
+        {
+          "command": "dependencyVisualizer.applySuggestion",
+          "when": "view == constantsList && viewItem == constantSuggestion",
+          "group": "inline"
+        }
+      ]
+    },
+    "configuration": {
+      "title": "Dependency Visualizer",
+      "properties": {
+        "dependencyVisualizer.autoRefresh": {
+          "type": "boolean",
+          "default": true,
+          "description": "Automatically refresh dependencies when build files change"
+        },
+        "dependencyVisualizer.showPlatformWarnings": {
+          "type": "boolean",
+          "default": true,
+          "description": "Show platform compatibility warnings"
+        }
+      }
+    }
+  },
+  "scripts": {
+    "vscode:prepublish": "npm run compile",
+    "compile": "tsc -p ./",
+    "watch": "tsc -watch -p ./"
+  },
+  "devDependencies": {
+    "@types/vscode": "^1.74.0",
+    "@types/node": "16.x",
+    "@types/xml2js": "^0.4.11",
+    "@types/mocha": "^10.0.1",
+    "typescript": "^4.9.4"
+  },
+  "dependencies": {
+    "xml2js": "^0.6.2",
+    "glob": "^8.1.0"
+  }
+}
