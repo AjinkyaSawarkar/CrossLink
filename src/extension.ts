@@ -7,6 +7,7 @@ import { FileWatcher } from './watchers/fileWatcher';
 import { RefactoringProvider } from './refactoring/refactoringProvider';
 import { RenamingProvider } from './refactoring/renamingProvider';
 import { NativeMethodMover } from './refactoring/nativeMethodMover';
+import { NativeMethodCopier } from './refactoring/nativeMethodCopier';
 import { ConstantExtractor } from './refactoring/constantExtractor';
 import { RefactoringCodeActionProvider } from './refactoring/codeActionProvider';
 import { registerMagicNumberFeatures } from './features/magicNumberConverter';
@@ -14,7 +15,9 @@ import { EnhancedFileConnectionListProvider } from './visualizer/enhancedFileCon
 import { StatisticsViewProvider } from './visualizer/statisticsViewProvider';
 import { ConstantsAnalyzer } from './constants/constantsAnalyzer';
 import { ConstantsTreeProvider } from './constants/constantsTreeProvider';
+import { ConstantsWebviewProvider } from './constants/constantsWebviewProvider';
 import { DashboardProvider } from './dashboard/dashboardProvider';
+import { LibraryHighlighter } from './features/libraryHighlighter';
 
 export function activate(context: vscode.ExtensionContext) {
     const analyzer = new DependencyAnalyzer();
@@ -31,11 +34,16 @@ export function activate(context: vscode.ExtensionContext) {
     // Register refactoring operations
     refactoringProvider.registerOperation(new RenamingProvider());
     refactoringProvider.registerOperation(new NativeMethodMover());
+    refactoringProvider.registerOperation(new NativeMethodCopier());
     refactoringProvider.registerOperation(new ConstantExtractor());
 
     // Initialize constants analyzer and tree provider
     const constantsAnalyzer = new ConstantsAnalyzer();
     const constantsTreeProvider = new ConstantsTreeProvider(constantsAnalyzer);
+    const constantsWebviewProvider = new ConstantsWebviewProvider(context.extensionUri, constantsAnalyzer);
+
+    // Initialize library highlighter
+    const libraryHighlighter = new LibraryHighlighter();
 
     // Register the unified dashboard provider
 const dashboardProvider = new DashboardProvider(
@@ -46,13 +54,13 @@ const dashboardProvider = new DashboardProvider(
 );
 
 context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('dependencyTree', treeProvider),
     vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider),
-    
 );
 
+    // Activate library highlighter
+    libraryHighlighter.activate(context);
 
-
-    
     // Register the constants tree view in the custom container
     const constantsTreeView = vscode.window.createTreeView('constantsList', {
         treeDataProvider: constantsTreeProvider,
@@ -60,6 +68,13 @@ context.subscriptions.push(
     });
 
     // Constants related commands
+    const showConstantsAnalysisCommand = vscode.commands.registerCommand(
+        'dependencyVisualizer.showConstantsAnalysis',
+        async () => {
+            await constantsWebviewProvider.showConstantsAnalysis();
+        }
+    );
+
     const showConstantsStatsCommand = vscode.commands.registerCommand(
         'dependencyVisualizer.showConstantsStats',
         async () => {
@@ -137,22 +152,78 @@ context.subscriptions.push(
             const uri = vscode.Uri.file(constant.file);
             const document = await vscode.workspace.openTextDocument(uri);
             
-            // Find the constant declaration and replace the name
-            const workspaceEdit = new vscode.WorkspaceEdit();
-            const position = new vscode.Position(constant.line, constant.column);
-            const range = document.getWordRangeAtPosition(position);
-            
-            if (range) {
-                workspaceEdit.replace(uri, range, suggestion);
+            try {
+                const workspaceEdit = new vscode.WorkspaceEdit();
+                const line = document.lineAt(constant.line);
+                const lineText = line.text;
+                
+                // Handle different constant declaration patterns
+                let newLineText = lineText;
+                
+                if (constant.language === 'java') {
+                    // Java: static final TYPE NAME = value;
+                    const javaRegex = /(static\s+final\s+\w+\s+)([A-Z_][A-Z0-9_]*)(\s*=\s*[^;]+;)/;
+                    const match = lineText.match(javaRegex);
+                    if (match) {
+                        newLineText = lineText.replace(javaRegex, `$1${suggestion}$3`);
+                    }
+                } else if (constant.language === 'cpp') {
+                    if (constant.type === 'macro') {
+                        // C++: #define NAME value
+                        const defineRegex = /(#define\s+)([A-Z_][A-Z0-9_]*)(\s+.+)/;
+                        const match = lineText.match(defineRegex);
+                        if (match) {
+                            newLineText = lineText.replace(defineRegex, `$1${suggestion}$3`);
+                        }
+                    } else {
+                        // C++: const TYPE NAME = value;
+                        const constRegex = /(const\s+\w+\s+)([A-Z_][A-Z0-9_]*)(\s*=\s*[^;]+;)/;
+                        const match = lineText.match(constRegex);
+                        if (match) {
+                            newLineText = lineText.replace(constRegex, `$1${suggestion}$3`);
+                        }
+                    }
+                }
+                
+                // Apply the edit
+                const range = new vscode.Range(constant.line, 0, constant.line, lineText.length);
+                workspaceEdit.replace(uri, range, newLineText);
+                
                 const success = await vscode.workspace.applyEdit(workspaceEdit);
                 
                 if (success) {
-                    vscode.window.showInformationMessage(`✅ Renamed "${constant.name}" to "${suggestion}"`);
+                    // Show success message with confidence
+                    const confidenceIcon = constant.confidence >= 80 ? '🔥' : 
+                                         constant.confidence >= 60 ? '💡' : '💭';
+                    vscode.window.showInformationMessage(
+                        `${confidenceIcon} Successfully renamed "${constant.name}" to "${suggestion}" (${constant.confidence}% confidence)`
+                    );
+                    
                     // Refresh the constants view
-                    constantsTreeProvider.updateConstants();
+                    await constantsTreeProvider.updateConstants();
+                    
+                    // Show the change in the editor
+                    const editor = await vscode.window.showTextDocument(document);
+                    const position = new vscode.Position(constant.line, 0);
+                    editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
                 } else {
-                    vscode.window.showErrorMessage('Failed to apply suggestion');
+                    vscode.window.showErrorMessage('❌ Failed to apply suggestion');
                 }
+            } catch (error) {
+                console.error('Error applying suggestion:', error);
+                vscode.window.showErrorMessage(`❌ Error applying suggestion: ${error}`);
+            }
+        }
+    );
+
+    const applyBestSuggestionCommand = vscode.commands.registerCommand(
+        'dependencyVisualizer.applyBestSuggestion',
+        async (constant: any) => {
+            if (constant.suggestedNames && constant.suggestedNames.length > 0) {
+                const bestSuggestion = constant.suggestedNames[0]; // First suggestion is the best
+                await vscode.commands.executeCommand('dependencyVisualizer.applySuggestion', constant, bestSuggestion);
+            } else {
+                vscode.window.showInformationMessage('No suggestions available for this constant');
             }
         }
     );
@@ -549,12 +620,14 @@ context.subscriptions.push(
     // Add all commands to subscriptions
     context.subscriptions.push(
         constantsTreeView,
+        showConstantsAnalysisCommand,
         showConstantsStatsCommand,
         searchConstantsCommand,
         groupConstantsCommand,
         toggleSuggestionsOnlyCommand,
         goToConstantCommand,
         applySuggestionCommand,
+        applyBestSuggestionCommand,
         refreshConstantsCommand,
         constantsFileWatcher,
         // Tree views

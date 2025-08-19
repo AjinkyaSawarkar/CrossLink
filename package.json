@@ -150,6 +150,12 @@
         "icon": "$(graph)"
       },
       {
+        "command": "dependencyVisualizer.showConstantsAnalysis",
+        "title": "Show Constants Analysis",
+        "category": "Dependency Visualizer",
+        "icon": "$(search)"
+      },
+      {
         "command": "dependencyVisualizer.searchConstants",
         "title": "Search Constants",
         "category": "Dependency Visualizer",
@@ -187,6 +193,18 @@
         "command": "extension.convertToConstants",
         "title": "Refactor: Convert Magic Numbers to Constants",
         "category": "Dependency Visualizer"
+      },
+      {
+        "command": "dependencyVisualizer.refreshLibraryHighlights",
+        "title": "Refresh Library Highlights",
+        "category": "Dependency Visualizer",
+        "icon": "$(refresh)"
+      },
+      {
+        "command": "dependencyVisualizer.showLibraryInfo",
+        "title": "Show Library Information",
+        "category": "Dependency Visualizer",
+        "icon": "$(info)"
       }
     ],
     "keybindings": [
@@ -212,33 +230,43 @@
           "command": "dependencyVisualizer.moveNativeMethod",
           "group": "1_modification",
           "when": "editorTextFocus && resourceLangId == java"
+        },
+        {
+          "command": "dependencyVisualizer.refreshLibraryHighlights",
+          "group": "1_modification",
+          "when": "resourceLangId == java"
         }
       ],
       "view/title": [
         {
-          "command": "dependencyVisualizer.showConstantsStats",
+          "command": "dependencyVisualizer.showConstantsAnalysis",
           "when": "view == constantsList",
           "group": "navigation@1"
         },
         {
-          "command": "dependencyVisualizer.searchConstants",
+          "command": "dependencyVisualizer.showConstantsStats",
           "when": "view == constantsList",
           "group": "navigation@2"
         },
         {
-          "command": "dependencyVisualizer.groupConstants",
+          "command": "dependencyVisualizer.searchConstants",
           "when": "view == constantsList",
           "group": "navigation@3"
         },
         {
-          "command": "dependencyVisualizer.toggleSuggestionsOnly",
+          "command": "dependencyVisualizer.groupConstants",
           "when": "view == constantsList",
           "group": "navigation@4"
         },
         {
-          "command": "dependencyVisualizer.refreshConstants",
+          "command": "dependencyVisualizer.toggleSuggestionsOnly",
           "when": "view == constantsList",
           "group": "navigation@5"
+        },
+        {
+          "command": "dependencyVisualizer.refreshConstants",
+          "when": "view == constantsList",
+          "group": "navigation@6"
         },
         {
           "command": "dependencyVisualizer.showConnectionStats",

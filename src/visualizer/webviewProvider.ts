@@ -36,11 +36,11 @@ export class WebviewProvider {
         this.updateWebview();
     }
 
-    private updateWebview(): void {
+    private async updateWebview(): Promise<void> {
         if (!this.panel) return;
 
         const projects = this.analyzer.getProjects();
-        const graphData = this.createGraphData(projects);
+        const graphData = await this.createGraphData(projects);
         
         this.panel.webview.postMessage({
             command: 'updateGraph',
@@ -48,9 +48,18 @@ export class WebviewProvider {
         });
     }
 
-    private createGraphData(projects: any[]): any {
+    private async createGraphData(projects: any[]): Promise<any> {
         const nodes: any[] = [];
         const links: any[] = [];
+        const nodeIdByPath: Map<string, string> = new Map();
+        const makeFileNode = (filePath: string, lang: 'java'|'cpp') => {
+            if (nodeIdByPath.has(filePath)) return nodeIdByPath.get(filePath)!;
+            const id = `file-${lang}-${nodeIdByPath.size}`;
+            const name = path.basename(filePath);
+            nodes.push({ id, name, type: 'file', language: lang, fullPath: filePath });
+            nodeIdByPath.set(filePath, id);
+            return id;
+        };
         
         projects.forEach((project, projectIndex) => {
             // Add project node
@@ -83,10 +92,52 @@ export class WebviewProvider {
                 links.push({
                     source: `project-${projectIndex}`,
                     target: nodeId,
-                    type: 'uses'
+                    type: 'uses',
+                    weight: 1
                 });
             });
         });
+        // Cross-language edges using file connections (JNI)
+        try {
+            const connections = await this.analyzer.getFileConnections();
+            // Aggregate by file pair
+            const agg = new Map<string, { javaFile: string; cppFile?: string; matched: number; unmatched: number }>();
+            for (const c of connections) {
+                const key = `${c.javaFile}::${c.cppFile}`;
+                if (!agg.has(key)) {
+                    agg.set(key, { javaFile: c.javaFile, cppFile: c.isMatched ? c.cppFile : undefined, matched: 0, unmatched: 0 });
+                }
+                const rec = agg.get(key)!;
+                if (c.isMatched) rec.matched++; else rec.unmatched++;
+            }
+
+            // Build nodes and links
+            const missingByJava: Map<string, number> = new Map();
+            agg.forEach(rec => {
+                if (rec.cppFile) {
+                    const jId = makeFileNode(rec.javaFile, 'java');
+                    const cId = makeFileNode(rec.cppFile, 'cpp');
+                    const weightRaw = Math.max(1, rec.matched);
+                    const weight = Math.min(6, 1 + Math.log(weightRaw));
+                    links.push({ source: jId, target: cId, type: 'cross', status: 'matched', weight });
+                }
+                const missed = rec.unmatched;
+                if (missed > 0) {
+                    missingByJava.set(rec.javaFile, (missingByJava.get(rec.javaFile) || 0) + missed);
+                }
+            });
+
+            // For unmatched, add a synthetic node per Java file to visualize missing JNI implementations
+            missingByJava.forEach((count, javaPath) => {
+                const jId = makeFileNode(javaPath, 'java');
+                const missingNodeId = `missing-${jId}`;
+                nodes.push({ id: missingNodeId, name: 'Missing JNI', type: 'missingStub', language: 'cpp', fullPath: '' });
+                const weight = Math.min(6, 1 + Math.log(Math.max(1, count)));
+                links.push({ source: jId, target: missingNodeId, type: 'cross', status: 'unmatched', weight });
+            });
+        } catch (e) {
+            console.warn('Failed to add cross-language connections to graph:', e);
+        }
         
         return { nodes, links };
     }
@@ -357,6 +408,17 @@ export class WebviewProvider {
             stroke-width: 3px;
         }
 
+        /* Link type/status styling */
+        .link.uses { stroke: var(--vscode-editor-foreground); }
+        .link.cross.matched { stroke: #22c55e; }
+        .link.cross.unmatched { stroke: #ef4444; stroke-dasharray: 4 3; }
+
+        /* Focus mode */
+        .faded { opacity: 0.15; }
+
+        /* File (JNI) node coloring */
+        .node.file.java { fill: #f59e0b; stroke: #b45309; stroke-width: 2px; }
+        .node.file.cpp { fill: #38bdf8; stroke: #0ea5e9; stroke-width: 2px; }
         .node-label {
             font-size: 11px;
             text-anchor: middle;
@@ -377,17 +439,15 @@ export class WebviewProvider {
 
         .tooltip {
             position: absolute;
-            background: var(--vscode-hover-background);
-            border: 1px solid var(--vscode-hover-border);
+            background: var(--vscode-editorWidget-background);
+            color: var(--vscode-editorWidget-foreground);
+            border: 1px solid var(--vscode-editorWidget-border);
+            padding: 10px;
             border-radius: 8px;
-            padding: 12px;
-            font-size: 12px;
+            box-shadow: 0 6px 20px rgba(0, 0, 0, 0.3);
+            display: none;
             z-index: 1000;
-            max-width: 300px;
-            box-shadow: 0 8px 24px rgba(0, 0, 0, 0.3);
             pointer-events: none;
-            opacity: 0;
-            transition: opacity 0.2s ease;
         }
 
         .tooltip.visible {
@@ -510,7 +570,30 @@ export class WebviewProvider {
     <div class="container">
         <div class="sidebar">
             <input type="text" class="search-box" placeholder="🔍 Search dependencies..." id="searchBox">
-            
+            <div class="legend" style="margin-bottom: 12px;">
+                <div class="legend-title">Filters</div>
+                <div class="legend-item">
+                    <input type="checkbox" id="filterUses" checked style="margin-right:8px;" />
+                    <span class="legend-text">Show Project → Dependency</span>
+                </div>
+                <div class="legend-item">
+                    <input type="checkbox" id="filterCross" style="margin-right:8px;" />
+                    <span class="legend-text">Show Java ↔ C++</span>
+                </div>
+                <div class="legend-item" style="display:flex;gap:8px;align-items:center;">
+                    <span class="legend-text">Status:</span>
+                    <select id="statusFilter" style="flex:1;background: var(--vscode-input-background); color: var(--vscode-input-foreground); border:1px solid var(--vscode-input-border); padding:6px; border-radius:6px;">
+                        <option value="all">All</option>
+                        <option value="ok">Healthy</option>
+                        <option value="conflict">Conflict</option>
+                        <option value="missing">Missing</option>
+                        <option value="platform">Platform</option>
+                        <option value="matched">JNI Matched</option>
+                        <option value="unmatched">JNI Missing</option>
+                    </select>
+                </div>
+            </div>
+
             <div class="legend">
                 <div class="legend-title">Status Legend</div>
                 <div class="legend-item">
@@ -664,33 +747,36 @@ export class WebviewProvider {
                 graphGroup.selectAll("*").remove();
                 
                 simulation = d3.forceSimulation(nodes)
-                    .force("link", d3.forceLink(links).id(d => d.id).distance(120))
+                    .force("link", d3.forceLink(links).id(d => d.id).distance(d => d.type === 'cross' ? 160 : 110))
                     .force("charge", d3.forceManyBody().strength(-400))
                     .force("center", d3.forceCenter(width / 2, height / 2))
+                    .force("x", d3.forceX(d => (d.group != null ? (width / 2 + (d.group - 0.5) * 40) : width / 2)).strength(0.05))
+                    .force("y", d3.forceY(d => (d.group != null ? (height / 2 + (d.group - 0.5) * 20) : height / 2)).strength(0.05))
                     .force("collision", d3.forceCollide().radius(d => d.type === 'project' ? 35 : 25));
                 
                 const link = graphGroup.append("g")
                     .selectAll("line")
                     .data(links)
                     .join("line")
-                    .attr("class", "link");
+                    .attr("class", d => 'link ' + d.type + ' ' + (d.status || ''))
+                    .attr("stroke-width", d => {
+                        const w = d.weight || 1;
+                        return d.type === 'cross' ? Math.min(6, 1 + Math.log(Math.max(1, w))) : 2;
+                    });
                 
                 const node = graphGroup.append("g")
                     .selectAll("circle")
                     .data(nodes)
                     .join("circle")
-                    .attr("class", d => \`node \${d.type} \${d.status || ''}\`)
-                    .attr("r", d => d.type === 'project' ? 25 : 18)
+                    .attr("class", d => 'node ' + d.type + ' ' + (d.status || '') + ' ' + (d.language || ''))
+                    .attr("r", d => d.type === 'project' ? 25 : (d.type === 'file' ? 12 : 18))
                     .call(d3.drag()
                         .on("start", dragstarted)
                         .on("drag", dragged)
                         .on("end", dragended))
-                    .on("mouseover", function(event, d) {
-                        showTooltip(event, d);
-                    })
-                    .on("mouseout", function() {
-                        hideTooltip();
-                    });
+                    .on("mouseenter", function(event, d) { showTooltip(event, d); })
+                    .on("mousemove", function(event, d) { showTooltip(event, d); })
+                    .on("mouseleave", function() { hideTooltip(); });
                 
                 const label = graphGroup.append("g")
                     .selectAll("text")
@@ -742,25 +828,33 @@ export class WebviewProvider {
             
             let detailsHTML = '';
             if (d.type === 'project') {
-                detailsHTML = \`
-                    <div class="tooltip-detail">Type: \${d.language.toUpperCase()}</div>
-                    <div class="tooltip-detail">Build System: \${d.buildSystem}</div>
-                    <div class="tooltip-detail">Dependencies: \${links.filter(l => l.source.id === d.id).length}</div>
-                \`;
+                detailsHTML = (
+                    '<div class="tooltip-detail">Type: ' + d.language.toUpperCase() + '</div>' +
+                    '<div class="tooltip-detail">Build System: ' + d.buildSystem + '</div>' +
+                    '<div class="tooltip-detail">Dependencies: ' + links.filter(l => (l.source.id ?? l.source) === d.id).length + '</div>'
+                );
+            } else if (d.type === 'dependency') {
+                // Avoid nested template literals inside outer template string: use concatenation
+                detailsHTML = (
+                    (d.platform ? '<div class="tooltip-detail">Platform: ' + d.platform + '</div>' : '') +
+                    (d.conflicts ? '<div class="tooltip-detail">Conflicts: ' + d.conflicts.join(', ') + '</div>' : '') +
+                    '<div class="tooltip-status ' + d.status + '">' + getStatusText(d.status) + '</div>'
+                );
+            } else if (d.type === 'file') {
+                detailsHTML = (
+                    d.fullPath ? '<div class="tooltip-detail">' + d.fullPath + '</div>' : ''
+                );
+            } else if (d.type === 'missingStub') {
+                const count = links.find(l => ((l.target.id ?? l.target) === d.id) && l.status === 'unmatched')?.weight || '';
+                detailsHTML = '<div class="tooltip-detail">Unmatched JNI methods ' + (count ? '(' + Math.round(count) + ')' : '') + '</div>';
             } else {
-                detailsHTML = \`
-                    <div class="tooltip-detail">Version: \${d.version}</div>
-                    <div class="tooltip-detail">Type: \${d.type}</div>
-                    \${d.platform ? \`<div class="tooltip-detail">Platform: \${d.platform}</div>\` : ''}
-                    \${d.conflicts ? \`<div class="tooltip-detail">Conflicts: \${d.conflicts.join(', ')}</div>\` : ''}
-                    <div class="tooltip-status \${d.status}">\${getStatusText(d.status)}</div>
-                \`;
+                detailsHTML = '<div class="tooltip-status ' + d.status + '">' + getStatusText(d.status) + '</div>';
             }
             
             details.innerHTML = detailsHTML;
             
-            tooltip.style.left = (event.pageX + 10) + 'px';
-            tooltip.style.top = (event.pageY - 10) + 'px';
+            tooltip.style.left = (event.pageX + 12) + 'px';
+            tooltip.style.top = (event.pageY + 12) + 'px';
             tooltip.classList.add('visible');
         }
         
@@ -813,8 +907,9 @@ export class WebviewProvider {
             alert('Export functionality to be implemented');
         });
         
-        // Search functionality
-        document.getElementById('searchBox').addEventListener('input', function(e) {
+        // Search functionality (live dim + Enter to focus first match)
+        const searchBox = document.getElementById('searchBox');
+        searchBox.addEventListener('input', function(e) {
             const searchTerm = e.target.value.toLowerCase();
             
             graphGroup.selectAll('.node')
@@ -826,6 +921,79 @@ export class WebviewProvider {
                 .style('opacity', d => {
                     return searchTerm === '' || d.name.toLowerCase().includes(searchTerm) ? 1 : 0.3;
                 });
+        });
+        searchBox.addEventListener('keydown', function(e) {
+            if (e.key === 'Enter') {
+                const term = e.target.value.toLowerCase();
+                const match = nodes.find(n => n.name.toLowerCase().includes(term));
+                if (match) {
+                    applyFocus(match.id);
+                    const t = d3.zoomIdentity.translate(width/2 - (match.x||0), height/2 - (match.y||0)).scale(1.2);
+                    svg.transition().duration(300).call(zoomBehavior.transform, t);
+                }
+            }
+        });
+
+        // Filters (hide cross by default). Also hide nodes with no visible links.
+        function applyFilters() {
+            const showUses = (document.getElementById('filterUses')).checked;
+            const showCross = (document.getElementById('filterCross')).checked;
+            const status = (document.getElementById('statusFilter')).value;
+
+            const isLinkVisible = (d) => {
+                const typeOk = (showUses && d.type === 'uses') || (showCross && d.type === 'cross');
+                const statusOk = status === 'all' || (d.status === status) || (status === 'ok' && (d.type === 'uses'));
+                return typeOk && statusOk;
+            };
+
+            graphGroup.selectAll('.link')
+                .style('display', d => (isLinkVisible(d) ? null : 'none'));
+
+            // Compute visible node ids
+            const visibleNodeIds = new Set();
+            links.forEach(l => {
+                if (isLinkVisible(l)) {
+                    const sid = l.source.id ?? l.source; const tid = l.target.id ?? l.target;
+                    visibleNodeIds.add(sid); visibleNodeIds.add(tid);
+                }
+            });
+            graphGroup.selectAll('.node').style('display', d => visibleNodeIds.has(d.id) ? null : 'none');
+            graphGroup.selectAll('.node-label').style('display', d => visibleNodeIds.has(d.id) ? null : 'none');
+        }
+        document.getElementById('filterUses').addEventListener('change', applyFilters);
+        document.getElementById('filterCross').addEventListener('change', applyFilters);
+        document.getElementById('statusFilter').addEventListener('change', applyFilters);
+
+        // Make Uses and Cross mutually exclusive to satisfy "only cross-language" view
+        const usesCb = document.getElementById('filterUses');
+        const crossCb = document.getElementById('filterCross');
+        usesCb.addEventListener('change', () => {
+            if (usesCb.checked) { crossCb.checked = false; }
+            applyFilters();
+        });
+        crossCb.addEventListener('change', () => {
+            if (crossCb.checked) { usesCb.checked = false; }
+            applyFilters();
+        });
+
+        // Focus mode
+        function applyFocus(nodeId) {
+            const neighborIds = new Set([nodeId]);
+            links.forEach(l => {
+                const sid = l.source.id ?? l.source; const tid = l.target.id ?? l.target;
+                if (sid === nodeId) neighborIds.add(tid);
+                if (tid === nodeId) neighborIds.add(sid);
+            });
+            graphGroup.selectAll('.node').classed('faded', d => !neighborIds.has(d.id));
+            graphGroup.selectAll('.node-label').classed('faded', d => !neighborIds.has(d.id));
+            graphGroup.selectAll('.link').classed('faded', l => {
+                const sid = l.source.id ?? l.source; const tid = l.target.id ?? l.target;
+                return sid !== nodeId && tid !== nodeId;
+            });
+        }
+        // Clear focus on background click
+        svg.on('click', function() {
+            graphGroup.selectAll('.faded').classed('faded', false);
         });
         
         // Window resize handler
@@ -842,6 +1010,7 @@ export class WebviewProvider {
             const message = event.data;
             if (message.command === 'updateGraph') {
                 updateGraph(message.data);
+                setTimeout(applyFilters, 0);
             }
         });
         

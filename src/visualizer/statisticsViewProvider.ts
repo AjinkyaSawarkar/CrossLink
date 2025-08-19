@@ -20,7 +20,6 @@ export class StatisticsViewProvider implements vscode.WebviewViewProvider {
         this._view = webviewView;
 
         webviewView.webview.options = {
-            allowScripts: true,
             localResourceRoots: [this._extensionUri]
         };
 

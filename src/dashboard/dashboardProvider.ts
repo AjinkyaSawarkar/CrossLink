@@ -57,7 +57,7 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
                 case 'refreshAll':
                     await this.refreshAll();
                     break;
-                    
+
             }
         });
 
@@ -169,16 +169,24 @@ export class DashboardProvider implements vscode.WebviewViewProvider {
     private async refreshAll() {
         this.showStatus('🔄 Refreshing all data...');
         
-        // Refresh all analyzers
-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-        if (workspaceFolder) {
-            await this.analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
-            await this.constantsAnalyzer.analyzeWorkspace(workspaceFolder);
+        try {
+            // Refresh dependencies
+            await this.showDependencies();
+            
+            // Refresh constants
+            await this.showConstants();
+            
+            // Refresh file connections
+            await this.showFileConnections();
+            
+            this.showStatus('✅ All data refreshed successfully!');
+        } catch (error) {
+            this.showStatus('❌ Error refreshing data');
+            console.error('Error refreshing all data:', error);
         }
-        
-        await this.updateRefactoringAvailability();
-        this.showStatus('✅ All data refreshed');
     }
+
+
 
     private showStatus(message: string) {
         if (this._view) {
@@ -1558,9 +1566,13 @@ private generateConstantsByFileHtml(constants: any[]): string {
             <span class="icon">📝</span>
             <span class="text">Show Constants Analysis</span>
         </button>
+        
+
     </div>
 
     <div class="divider"></div>
+    
+
 
     <div class="feature-section">
         <div class="section-title">🛠️ Refactoring Tools</div>
@@ -1602,6 +1614,8 @@ private generateConstantsByFileHtml(constants: any[]): string {
             vscode.postMessage({ type: 'showConstants' });
         }
 
+
+
         function executeRefactoring() {
             vscode.postMessage({ type: 'executeRefactoring' });
         }
@@ -1626,6 +1640,8 @@ private generateConstantsByFileHtml(constants: any[]): string {
             }
         }
 
+
+
         // Listen for messages from the extension
         window.addEventListener('message', event => {
             const message = event.data;
@@ -1636,6 +1652,7 @@ private generateConstantsByFileHtml(constants: any[]): string {
                 case 'showStatus':
                     updateStatus(message.message);
                     break;
+
             }
         });
 

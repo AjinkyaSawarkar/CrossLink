@@ -263,72 +263,47 @@ export class ConstantsAnalyzer {
 
     private initializeNamingRules(): void {
         this.namingRules = [
-            // Variable Assignment Rules
+            // Magic Number Detection - High Priority
             new NamingRule(
-                'variable_assignment',
-                (value, context) => context.type === 'variable_assignment',
+                'magic_number',
                 (value, context) => {
-                    const suggestions = [];
-                    if (context.variableName) {
-                        if (context.variableName.toLowerCase().includes('connection')) {
-                            suggestions.push('MAX_CONNECTIONS', 'CONNECTION_LIMIT');
-                        } else if (context.variableName.toLowerCase().includes('timeout')) {
-                            suggestions.push('TIMEOUT_DURATION', 'TIMEOUT_MS');
-                        } else {
-                            suggestions.push(`MAX_${context.variableName.toUpperCase()}`, `${context.variableName.toUpperCase()}_LIMIT`);
-                        }
-                    }
-                    return suggestions;
+                    const numValue = parseInt(value);
+                    return /^\d{2,}$/.test(value) && 
+                           !['10', '100', '1000', '3600', '365', '24', '60', '99', '50', '256', '512'].includes(value) &&
+                           !/^0+$/.test(value);
                 },
-                80
-            ),
-
-            // Function Arguments Rules
-            new NamingRule(
-                'function_argument',
-                (value, context) => context.type === 'function_argument',
                 (value, context) => {
                     const suggestions = [];
-                    if (context.functionName) {
-                        const funcName = context.functionName.toLowerCase();
-                        if (funcName.includes('listen') || funcName.includes('port')) {
-                            suggestions.push('SERVER_PORT', 'DEFAULT_PORT', 'LISTEN_PORT');
-                        } else if (funcName.includes('timeout') || funcName.includes('delay') || funcName.includes('sleep')) {
-                            suggestions.push('TIMEOUT_DURATION_MS', 'DELAY_MS', 'SLEEP_DURATION');
-                        } else if (funcName.includes('connect')) {
-                            suggestions.push('CONNECTION_TIMEOUT', 'CONNECT_DELAY');
-                        }
-                    }
-                    return suggestions;
-                },
-                85
-            ),
-
-            // Calculation Rules
-            new NamingRule(
-                'calculation',
-                (value, context) => context.type === 'calculation',
-                (value, context) => {
-                    const suggestions = [];
-                    const numValue = parseFloat(value);
+                    const numValue = parseInt(value);
                     
-                    if (numValue > 1 && numValue < 2) {
-                        suggestions.push('TAX_RATE_MULTIPLIER', 'INTEREST_RATE', 'FEE_MULTIPLIER');
-                    } else if (numValue < 1 && numValue > 0) {
-                        suggestions.push('DISCOUNT_FACTOR', 'REDUCTION_RATE', 'PERCENTAGE_FACTOR');
-                    } else if (numValue > 10 && numValue < 100) {
-                        suggestions.push('SHIPPING_FEE', 'SERVICE_FEE', 'PROCESSING_FEE');
+                    // Common patterns for magic numbers
+                    if (numValue >= 1000 && numValue <= 9999) {
+                        suggestions.push('DEFAULT_TIMEOUT_MS', 'MAX_BUFFER_SIZE', 'DEFAULT_PORT');
+                    } else if (numValue >= 100 && numValue <= 999) {
+                        suggestions.push('MAX_RETRIES', 'DEFAULT_SIZE', 'MAX_LENGTH');
+                    } else if (numValue >= 10 && numValue <= 99) {
+                        suggestions.push('MAX_ATTEMPTS', 'RETRY_COUNT', 'DEFAULT_COUNT');
                     }
+                    
+                    // Context-specific suggestions
+                    if (context.type === 'comparison') {
+                        suggestions.push('THRESHOLD_VALUE', 'LIMIT_VALUE', 'MAX_VALUE');
+                    } else if (context.type === 'loop_condition') {
+                        suggestions.push('MAX_ITERATIONS', 'LOOP_LIMIT', 'ITERATION_COUNT');
+                    } else if (context.type === 'array_index') {
+                        suggestions.push('ARRAY_SIZE', 'INDEX_LIMIT', 'MAX_INDEX');
+                    }
+                    
                     return suggestions;
                 },
-                75
+                95
             ),
 
-            // Time Calculations
+            // Time-related Constants
             new NamingRule(
-                'time_calc',
+                'time_constants',
                 (value, context) => {
-                    const timeKeywords = ['second', 'minute', 'hour', 'day', 'ms', 'time'];
+                    const timeKeywords = ['second', 'minute', 'hour', 'day', 'ms', 'time', 'delay', 'sleep', 'wait'];
                     return timeKeywords.some(keyword => 
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
@@ -337,25 +312,31 @@ export class ConstantsAnalyzer {
                     const suggestions = [];
                     const numValue = parseInt(value);
                     
+                    // Common time values
                     if (numValue === 1000) {
-                        suggestions.push('MILLISECONDS_PER_SECOND', 'MS_PER_SECOND');
+                        suggestions.push('MILLISECONDS_PER_SECOND', 'MS_PER_SECOND', 'DEFAULT_TIMEOUT_MS');
                     } else if (numValue === 60) {
-                        suggestions.push('SECONDS_PER_MINUTE', 'MINUTES_PER_HOUR');
+                        suggestions.push('SECONDS_PER_MINUTE', 'MINUTES_PER_HOUR', 'DEFAULT_DELAY_SECONDS');
                     } else if (numValue === 3600) {
-                        suggestions.push('SECONDS_PER_HOUR');
+                        suggestions.push('SECONDS_PER_HOUR', 'HOUR_IN_SECONDS', 'DEFAULT_TIMEOUT_SECONDS');
                     } else if (numValue === 86400) {
-                        suggestions.push('SECONDS_PER_DAY');
+                        suggestions.push('SECONDS_PER_DAY', 'DAY_IN_SECONDS', 'MAX_TIMEOUT_SECONDS');
+                    } else if (numValue === 5000) {
+                        suggestions.push('DEFAULT_TIMEOUT_MS', 'CONNECTION_TIMEOUT_MS', 'READ_TIMEOUT_MS');
+                    } else if (numValue === 30000) {
+                        suggestions.push('LONG_TIMEOUT_MS', 'SESSION_TIMEOUT_MS', 'IDLE_TIMEOUT_MS');
                     }
+                    
                     return suggestions;
                 },
                 90
             ),
 
-            // Buffer Sizes
+            // Buffer and Size Constants
             new NamingRule(
                 'buffer_size',
                 (value, context) => {
-                    const bufferKeywords = ['buffer', 'size', 'length', 'capacity'];
+                    const bufferKeywords = ['buffer', 'size', 'length', 'capacity', 'bytes', 'kb', 'mb'];
                     return bufferKeywords.some(keyword => 
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
@@ -364,14 +345,154 @@ export class ConstantsAnalyzer {
                     const suggestions = [];
                     const numValue = parseInt(value);
                     
-                    if (numValue === 1024 || numValue === 2048 || numValue === 4096) {
-                        suggestions.push('DEFAULT_BUFFER_SIZE', 'BUFFER_CAPACITY', 'READ_BUFFER_SIZE');
-                    } else {
-                        suggestions.push('BUFFER_SIZE', 'MAX_BUFFER_SIZE');
+                    // Common buffer sizes
+                    if (numValue === 1024) {
+                        suggestions.push('DEFAULT_BUFFER_SIZE', 'BUFFER_CAPACITY', 'READ_BUFFER_SIZE', 'KILOBYTE_SIZE');
+                    } else if (numValue === 2048) {
+                        suggestions.push('LARGE_BUFFER_SIZE', 'WRITE_BUFFER_SIZE', 'DOUBLE_KILOBYTE_SIZE');
+                    } else if (numValue === 4096) {
+                        suggestions.push('PAGE_SIZE', 'MAX_BUFFER_SIZE', 'QUAD_KILOBYTE_SIZE');
+                    } else if (numValue === 8192) {
+                        suggestions.push('LARGE_PAGE_SIZE', 'EXTENDED_BUFFER_SIZE', 'EIGHT_KILOBYTE_SIZE');
+                    } else if (numValue === 65536) {
+                        suggestions.push('MAX_BUFFER_SIZE', 'LARGE_CHUNK_SIZE', 'SIXTY_FOUR_KILOBYTE_SIZE');
                     }
+                    
                     return suggestions;
                 },
                 85
+            ),
+
+            // Network and Connection Constants
+            new NamingRule(
+                'network_constants',
+                (value, context) => {
+                    const networkKeywords = ['port', 'connection', 'socket', 'http', 'tcp', 'udp', 'server', 'client'];
+                    return networkKeywords.some(keyword => 
+                        context.surroundingCode.toLowerCase().includes(keyword)
+                    );
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    
+                    // Common port numbers
+                    if (numValue === 80) {
+                        suggestions.push('HTTP_PORT', 'DEFAULT_HTTP_PORT', 'WEB_PORT');
+                    } else if (numValue === 443) {
+                        suggestions.push('HTTPS_PORT', 'SECURE_HTTP_PORT', 'SSL_PORT');
+                    } else if (numValue === 8080) {
+                        suggestions.push('ALTERNATIVE_HTTP_PORT', 'DEV_PORT', 'PROXY_PORT');
+                    } else if (numValue === 3000) {
+                        suggestions.push('DEV_SERVER_PORT', 'NODE_PORT', 'APPLICATION_PORT');
+                    } else if (numValue === 5432) {
+                        suggestions.push('POSTGRES_PORT', 'DATABASE_PORT', 'DB_PORT');
+                    } else if (numValue === 3306) {
+                        suggestions.push('MYSQL_PORT', 'DATABASE_PORT', 'DB_PORT');
+                    } else if (numValue === 27017) {
+                        suggestions.push('MONGO_PORT', 'MONGODB_PORT', 'NOSQL_PORT');
+                    }
+                    
+                    // Connection limits
+                    if (numValue >= 100 && numValue <= 1000) {
+                        suggestions.push('MAX_CONNECTIONS', 'CONNECTION_POOL_SIZE', 'DEFAULT_CONNECTION_LIMIT');
+                    }
+                    
+                    return suggestions;
+                },
+                88
+            ),
+
+            // UI and Display Constants
+            new NamingRule(
+                'ui_constants',
+                (value, context) => {
+                    const uiKeywords = ['width', 'height', 'size', 'pixel', 'px', 'margin', 'padding', 'border', 'font'];
+                    return uiKeywords.some(keyword => 
+                        context.surroundingCode.toLowerCase().includes(keyword)
+                    );
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    
+                    // Common UI dimensions
+                    if (numValue === 800) {
+                        suggestions.push('DEFAULT_WINDOW_WIDTH', 'MIN_WINDOW_WIDTH', 'STANDARD_WIDTH');
+                    } else if (numValue === 600) {
+                        suggestions.push('DEFAULT_WINDOW_HEIGHT', 'MIN_WINDOW_HEIGHT', 'STANDARD_HEIGHT');
+                    } else if (numValue === 1024) {
+                        suggestions.push('LARGE_WINDOW_WIDTH', 'HD_WIDTH', 'STANDARD_DESKTOP_WIDTH');
+                    } else if (numValue === 768) {
+                        suggestions.push('LARGE_WINDOW_HEIGHT', 'HD_HEIGHT', 'STANDARD_DESKTOP_HEIGHT');
+                    } else if (numValue === 16) {
+                        suggestions.push('DEFAULT_MARGIN', 'STANDARD_PADDING', 'BORDER_WIDTH');
+                    } else if (numValue === 12) {
+                        suggestions.push('SMALL_MARGIN', 'COMPACT_PADDING', 'MIN_BORDER_WIDTH');
+                    }
+                    
+                    return suggestions;
+                },
+                82
+            ),
+
+            // Error and Status Constants
+            new NamingRule(
+                'error_constants',
+                (value, context) => {
+                    const errorKeywords = ['error', 'status', 'code', 'exception', 'fail', 'success', 'ok'];
+                    return errorKeywords.some(keyword => 
+                        context.surroundingCode.toLowerCase().includes(keyword)
+                    );
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    
+                    // Common status codes
+                    if (numValue === 0) {
+                        suggestions.push('SUCCESS_CODE', 'OK_STATUS', 'NO_ERROR');
+                    } else if (numValue === 1) {
+                        suggestions.push('ERROR_CODE', 'FAILURE_STATUS', 'GENERAL_ERROR');
+                    } else if (numValue === -1) {
+                        suggestions.push('INVALID_STATUS', 'ERROR_CODE', 'FAILURE_CODE');
+                    } else if (numValue === 404) {
+                        suggestions.push('NOT_FOUND_ERROR', 'RESOURCE_NOT_FOUND', 'HTTP_404');
+                    } else if (numValue === 500) {
+                        suggestions.push('INTERNAL_ERROR', 'SERVER_ERROR', 'HTTP_500');
+                    }
+                    
+                    return suggestions;
+                },
+                85
+            ),
+
+            // Mathematical Constants
+            new NamingRule(
+                'math_constants',
+                (value, context) => {
+                    const mathKeywords = ['pi', 'euler', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan'];
+                    return mathKeywords.some(keyword => 
+                        context.surroundingCode.toLowerCase().includes(keyword)
+                    );
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseFloat(value);
+                    
+                    if (Math.abs(numValue - Math.PI) < 0.01) {
+                        suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
+                    } else if (Math.abs(numValue - Math.E) < 0.01) {
+                        suggestions.push('EULER_NUMBER', 'MATH_E', 'E_CONSTANT');
+                    } else if (numValue === 2.718) {
+                        suggestions.push('EULER_NUMBER', 'MATH_E', 'E_CONSTANT');
+                    } else if (numValue === 3.14159) {
+                        suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
+                    }
+                    
+                    return suggestions;
+                },
+                90
             ),
 
             // Default rule for numeric values
@@ -383,10 +504,15 @@ export class ConstantsAnalyzer {
                     const numValue = parseInt(value);
                     
                     if (numValue > 0 && numValue < 10) {
-                        suggestions.push('MAX_RETRIES', 'RETRY_COUNT', 'MAX_ATTEMPTS');
+                        suggestions.push('MAX_RETRIES', 'RETRY_COUNT', 'MAX_ATTEMPTS', 'DEFAULT_COUNT');
+                    } else if (numValue >= 10 && numValue < 100) {
+                        suggestions.push('DEFAULT_SIZE', 'STANDARD_COUNT', 'NORMAL_LIMIT');
                     } else if (numValue >= 100 && numValue < 1000) {
-                        suggestions.push('MAX_LENGTH', 'SIZE_LIMIT', 'COUNT_LIMIT');
+                        suggestions.push('MAX_LENGTH', 'SIZE_LIMIT', 'COUNT_LIMIT', 'DEFAULT_LIMIT');
+                    } else if (numValue >= 1000) {
+                        suggestions.push('LARGE_SIZE', 'MAX_CAPACITY', 'UPPER_LIMIT', 'MAX_VALUE');
                     }
+                    
                     return suggestions;
                 },
                 40

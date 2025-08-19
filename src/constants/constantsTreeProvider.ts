@@ -117,10 +117,22 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
         fileGroups.forEach((constants, fileName) => {
             const children = constants.map(constant => new ConstantItemTreeItem(constant));
             const suggestionsCount = constants.filter(c => c.suggestedNames.length > 0).length;
-            items.push(new GroupTreeItem(fileName, children, `📄 ${fileName} (${constants.length} constants, ${suggestionsCount} with suggestions)`));
+            const highConfidenceCount = constants.filter(c => c.confidence >= 80).length;
+            
+            const statusIcon = suggestionsCount > 0 ? '💡' : '✅';
+            const statusText = suggestionsCount > 0 ? 
+                `${suggestionsCount} need suggestions` : 
+                'All well-named';
+            
+            items.push(new GroupTreeItem(fileName, children, 
+                `${statusIcon} 📄 ${fileName} (${constants.length} constants • ${statusText})`));
         });
 
-        return items.sort((a, b) => a.label.localeCompare(b.label));
+        return items.sort((a, b) => {
+            const labelA = typeof a.label === 'string' ? a.label : a.label?.label || '';
+            const labelB = typeof b.label === 'string' ? b.label : b.label?.label || '';
+            return labelA.localeCompare(labelB);
+        });
     }
 
     private groupByType(constants: ConstantInfo[]): ConstantTreeItem[] {
@@ -136,10 +148,16 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
         const items: GroupTreeItem[] = [];
         typeGroups.forEach((constants, type) => {
             const children = constants.map(constant => new ConstantItemTreeItem(constant));
-            items.push(new GroupTreeItem(type, children, `🔧 ${type} (${constants.length})`));
+            const suggestionsCount = constants.filter(c => c.suggestedNames.length > 0).length;
+            const icon = this.getTypeIcon(type);
+            items.push(new GroupTreeItem(type, children, `${icon} ${type} (${constants.length} constants • ${suggestionsCount} need suggestions)`));
         });
 
-        return items.sort((a, b) => a.label.localeCompare(b.label));
+        return items.sort((a, b) => {
+            const labelA = typeof a.label === 'string' ? a.label : a.label?.label || '';
+            const labelB = typeof b.label === 'string' ? b.label : b.label?.label || '';
+            return labelA.localeCompare(labelB);
+        });
     }
 
     private groupByCategory(constants: ConstantInfo[]): ConstantTreeItem[] {
@@ -156,10 +174,15 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
         categoryGroups.forEach((constants, category) => {
             const icon = this.getCategoryIcon(category);
             const children = constants.map(constant => new ConstantItemTreeItem(constant));
-            items.push(new GroupTreeItem(category, children, `${icon} ${category} (${constants.length})`));
+            const suggestionsCount = constants.filter(c => c.suggestedNames.length > 0).length;
+            items.push(new GroupTreeItem(category, children, `${icon} ${category} (${constants.length} constants • ${suggestionsCount} need suggestions)`));
         });
 
-        return items.sort((a, b) => a.label.localeCompare(b.label));
+        return items.sort((a, b) => {
+            const labelA = typeof a.label === 'string' ? a.label : a.label?.label || '';
+            const labelB = typeof b.label === 'string' ? b.label : b.label?.label || '';
+            return labelA.localeCompare(labelB);
+        });
     }
 
     private groupBySuggestions(constants: ConstantInfo[]): ConstantTreeItem[] {
@@ -170,12 +193,15 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
         
         if (withSuggestions.length > 0) {
             const children = withSuggestions.map(constant => new ConstantItemTreeItem(constant));
-            items.push(new GroupTreeItem('with-suggestions', children, `💡 With Suggestions (${withSuggestions.length})`));
+            const highConfidenceCount = withSuggestions.filter(c => c.confidence >= 80).length;
+            items.push(new GroupTreeItem('with-suggestions', children, 
+                `💡 Constants Needing Suggestions (${withSuggestions.length} • ${highConfidenceCount} high confidence)`));
         }
         
         if (withoutSuggestions.length > 0) {
             const children = withoutSuggestions.map(constant => new ConstantItemTreeItem(constant));
-            items.push(new GroupTreeItem('without-suggestions', children, `📝 Well Named (${withoutSuggestions.length})`));
+            items.push(new GroupTreeItem('without-suggestions', children, 
+                `✅ Well Named Constants (${withoutSuggestions.length})`));
         }
         
         return items;
@@ -186,6 +212,20 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
             case 'string': return '📝';
             case 'numeric': return '🔢';
             case 'boolean': return '✅';
+            case 'magic_number': return '🔮';
+            default: return '🔹';
+        }
+    }
+
+    private getTypeIcon(type: string): string {
+        switch (type.toLowerCase()) {
+            case 'int': return '🔢';
+            case 'string': return '📝';
+            case 'boolean': return '✅';
+            case 'double': return '🔢';
+            case 'float': return '🔢';
+            case 'long': return '🔢';
+            case 'macro': return '🔧';
             default: return '🔹';
         }
     }
@@ -205,7 +245,7 @@ export abstract class ConstantTreeItem extends vscode.TreeItem {}
 export class NoConstantsItem extends ConstantTreeItem {
     constructor() {
         super('No constants found', vscode.TreeItemCollapsibleState.None);
-        this.description = 'Add constants to your Java or C++ files';
+        this.description = 'Add constants to your Java or C++ files to get started';
         this.iconPath = new vscode.ThemeIcon('info');
         this.contextValue = 'noConstants';
     }
@@ -232,16 +272,25 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
         this.description = this.createDescription();
         this.tooltip = this.createTooltip();
         this.contextValue = constant.suggestedNames.length > 0 ? 'constantWithSuggestions' : 'constant';
+        
+        // Set command based on whether suggestions are available
+        if (constant.suggestedNames.length > 0) {
+            this.command = {
+                command: 'dependencyVisualizer.applyBestSuggestion',
+                title: 'Apply Best Suggestion',
+                arguments: [constant]
+            };
+        } else {
+            this.command = {
+                command: 'dependencyVisualizer.goToConstant',
+                title: 'Go to Constant',
+                arguments: [constant]
+            };
+        }
+
         this.iconPath = this.getIcon();
         
-        // Make it clickable to go to definition
-        this.command = {
-            command: 'dependencyVisualizer.goToConstant',
-            title: 'Go to Constant',
-            arguments: [constant]
-        };
-
-        // Create suggestion items
+        // Create suggestion items with apply buttons
         this.suggestions = constant.suggestedNames.map((suggestion, index) => 
             new SuggestionTreeItem(suggestion, constant, index === 0) // First suggestion is primary
         );
@@ -249,13 +298,36 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
 
     private createDescription(): string {
         const parts = [];
-        parts.push(`= ${this.constant.value}`);
+        
+        // Add value with type indicator
+        const typeIcon = this.getTypeIcon(this.constant.type);
+        parts.push(`${typeIcon} = ${this.constant.value}`);
         
         if (this.constant.suggestedNames.length > 0) {
-            parts.push(`💡 ${this.constant.suggestedNames.length} suggestion${this.constant.suggestedNames.length !== 1 ? 's' : ''}`);
+            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' : 
+                                 this.constant.confidence >= 60 ? '💡' : '💭';
+            const confidenceText = this.constant.confidence >= 80 ? 'High' : 
+                                 this.constant.confidence >= 60 ? 'Medium' : 'Low';
+            const actionText = this.constant.confidence >= 70 ? '🔥 Click to Apply Best' : '💡 Click to Apply Best';
+            parts.push(`${confidenceIcon} ${this.constant.suggestedNames.length} suggestion${this.constant.suggestedNames.length !== 1 ? 's' : ''} (${confidenceText} confidence) • ${actionText}`);
+        } else {
+            parts.push('✅ Well named');
         }
         
         return parts.join(' ');
+    }
+
+    private getTypeIcon(type: string): string {
+        switch (type.toLowerCase()) {
+            case 'int': return '🔢';
+            case 'string': return '📝';
+            case 'boolean': return '✅';
+            case 'double': return '🔢';
+            case 'float': return '🔢';
+            case 'long': return '🔢';
+            case 'macro': return '🔧';
+            default: return '🔹';
+        }
     }
 
     private getIcon(): vscode.ThemeIcon {
@@ -265,9 +337,11 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
         
         let color: vscode.ThemeColor;
         if (this.constant.suggestedNames.length > 0) {
-            color = this.constant.confidence >= 70 ? 
+            color = this.constant.confidence >= 80 ? 
                    new vscode.ThemeColor('charts.orange') : 
-                   new vscode.ThemeColor('charts.yellow');
+                   this.constant.confidence >= 60 ?
+                   new vscode.ThemeColor('charts.yellow') :
+                   new vscode.ThemeColor('charts.red');
         } else {
             color = new vscode.ThemeColor('charts.green');
         }
@@ -279,22 +353,45 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
         const tooltip = new vscode.MarkdownString();
         tooltip.isTrusted = true;
         
-        tooltip.appendMarkdown(`## 🔹 ${this.constant.name}\n\n`);
-        tooltip.appendMarkdown(`**Value:** \`${this.constant.value}\`\n\n`);
-        tooltip.appendMarkdown(`**Type:** \`${this.constant.type}\`\n\n`);
-        tooltip.appendMarkdown(`**Language:** ${this.constant.language.toUpperCase()}\n\n`);
-        tooltip.appendMarkdown(`**Scope:** ${this.constant.scope}\n\n`);
-        tooltip.appendMarkdown(`**File:** \`${path.basename(this.constant.file)}\`\n\n`);
-        tooltip.appendMarkdown(`**Line:** ${this.constant.line + 1}\n\n`);
+        // Header with constant name and status
+        const statusIcon = this.constant.suggestedNames.length > 0 ? '💡' : '✅';
+        const statusText = this.constant.suggestedNames.length > 0 ? 'Needs Suggestions' : 'Well Named';
+        tooltip.appendMarkdown(`## ${statusIcon} ${this.constant.name}\n\n`);
+        
+        // Status badge
+        const statusColor = this.constant.suggestedNames.length > 0 ? '#ff9800' : '#4caf50';
+        tooltip.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
+        
+        // Constant details
+        tooltip.appendMarkdown(`**🔢 Value:** \`${this.constant.value}\`\n\n`);
+        tooltip.appendMarkdown(`**🔧 Type:** \`${this.constant.type}\`\n\n`);
+        tooltip.appendMarkdown(`**🏷️ Language:** ${this.constant.language.toUpperCase()}\n\n`);
+        tooltip.appendMarkdown(`**📁 Scope:** ${this.constant.scope}\n\n`);
+        tooltip.appendMarkdown(`**📄 File:** \`${path.basename(this.constant.file)}\`\n\n`);
+        tooltip.appendMarkdown(`**📍 Line:** ${this.constant.line + 1}\n\n`);
         
         if (this.constant.suggestedNames.length > 0) {
-            tooltip.appendMarkdown(`**Suggestions (${this.constant.confidence}% confidence):**\n\n`);
+            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' : 
+                                 this.constant.confidence >= 60 ? '💡' : '💭';
+            const confidenceText = this.constant.confidence >= 80 ? 'High' : 
+                                 this.constant.confidence >= 60 ? 'Medium' : 'Low';
+            tooltip.appendMarkdown(`**${confidenceIcon} Suggestions (${confidenceText} confidence - ${this.constant.confidence}%):**\n\n`);
+            
+            // Add "Apply Best Suggestion" button
+            const bestSuggestion = this.constant.suggestedNames[0];
+            const applyBestButton = `[🔥 Apply Best: \`${bestSuggestion}\`](command:dependencyVisualizer.applyBestSuggestion?${encodeURIComponent(JSON.stringify([this.constant]))})`;
+            tooltip.appendMarkdown(`${applyBestButton}\n\n`);
+            
+            // List all suggestions
             this.constant.suggestedNames.forEach((suggestion, index) => {
                 const icon = index === 0 ? '⭐' : '💡';
-                tooltip.appendMarkdown(`${icon} \`${suggestion}\`\n\n`);
+                const label = index === 0 ? 'Recommended' : 'Alternative';
+                const applyButton = `[Apply \`${suggestion}\`](command:dependencyVisualizer.applySuggestion?${encodeURIComponent(JSON.stringify([this.constant, suggestion]))})`;
+                tooltip.appendMarkdown(`${icon} \`${suggestion}\` (${label}) ${applyButton}\n\n`);
             });
         } else {
             tooltip.appendMarkdown(`✅ **Well named** - No suggestions needed\n\n`);
+            tooltip.appendMarkdown(`This constant follows good naming conventions and doesn't require any changes.`);
         }
         
         return tooltip;
@@ -309,7 +406,7 @@ export class SuggestionTreeItem extends ConstantTreeItem {
     ) {
         super(suggestion, vscode.TreeItemCollapsibleState.None);
         
-        this.description = isPrimary ? '⭐ Recommended' : '💡 Alternative';
+        this.description = this.createDescription();
         this.contextValue = 'constantSuggestion';
         this.iconPath = new vscode.ThemeIcon(
             isPrimary ? 'star-full' : 'lightbulb', 
@@ -322,5 +419,30 @@ export class SuggestionTreeItem extends ConstantTreeItem {
             title: 'Apply Suggestion',
             arguments: [constant, suggestion]
         };
+    }
+
+    private createDescription(): string {
+        const parts = [];
+        
+        if (this.isPrimary) {
+            parts.push('⭐ Recommended');
+        } else {
+            parts.push('💡 Alternative');
+        }
+        
+        // Add confidence indicator
+        const confidence = this.constant.confidence;
+        if (confidence >= 80) {
+            parts.push('🔥 High Confidence');
+        } else if (confidence >= 60) {
+            parts.push('💡 Medium Confidence');
+        } else {
+            parts.push('💭 Low Confidence');
+        }
+        
+        // Add apply button text
+        parts.push('🔄 Click to Apply');
+        
+        return parts.join(' • ');
     }
 }
