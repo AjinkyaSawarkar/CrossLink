@@ -29,13 +29,13 @@ export class NativeMethodMover implements RefactoringOperation {
         if (context.language !== 'java') {
             return false;
         }
-        
         const document = context.document;
         const position = context.selection.active;
-        const line = document.lineAt(position.line);
-        
-        // Check if current line contains 'native' keyword
-        return line.text.includes('native') && line.text.includes('(');
+        const text = document.lineAt(position.line).text;
+        if (text.includes('native') && text.includes('(')) return true;
+        // Allow wrapper that calls *Impl(...)
+        if (/\b\w+Impl\s*\(/.test(text)) return true;
+        return false;
     }
 
     async apply(context: RefactoringContext): Promise<vscode.WorkspaceEdit> {
@@ -90,30 +90,76 @@ export class NativeMethodMover implements RefactoringOperation {
     private async extractNativeMethodInfo(context: RefactoringContext): Promise<NativeMethodInfo | null> {
         const document = context.document;
         const position = context.selection.active;
-        const line = document.lineAt(position.line);
-        
-        // Parse native method signature
-        const nativeMethodRegex = /(?:public|private|protected)?\s*(?:static\s+)?native\s+(\w+)\s+(\w+)\s*\(([^)]*)\)/;
-        const match = line.text.match(nativeMethodRegex);
-        
-        if (!match) {
+
+        // Find the complete method declaration range near the cursor
+        const methodRange = await this.findMethodRange(document, position);
+        if (!methodRange) {
             return null;
         }
-        
+
+        const methodText = document.getText(methodRange);
+
+        // Parse native method signature from the captured text
+        // Allow flexible modifier order (e.g., 'native private'), annotations, arrays/generics
+        const nativeMethodRegex = new RegExp(
+            String.raw`^\s*` +
+            String.raw`(?:@[\w.]+(?:\([^)]*\))?\s*)*` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            String.raw`native\s+` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            String.raw`([A-Za-z_$][\w$<>.?]*?(?:\s*\[\s*\])*)\s+` +
+            String.raw`([A-Za-z_$]\w*)\s*` +
+            String.raw`\(([^)]*)\)\s*;`,
+            'm'
+        );
+        let match = methodText.match(nativeMethodRegex);
+        if (!match) {
+            // Loose fallback window around cursor
+            const docText = document.getText();
+            const pos = document.offsetAt(methodRange.start);
+            const windowStart = Math.max(0, pos - 1000);
+            const windowEnd = Math.min(docText.length, pos + 2000);
+            const windowText = docText.slice(windowStart, windowEnd);
+            const looseRegex = /native[\s\w@<>,\[\].$?]*?([A-Za-z_$][\w$<>.?]*(?:\s*\[\s*\])*)\s+([A-Za-z_$]\w*)\s*\(([^)]*)\)\s*;/m;
+            const looseMatch = windowText.match(looseRegex);
+            if (looseMatch) {
+                match = looseMatch as any;
+            }
+        }
+        if (!match) {
+            // Wrapper fallback: find *Impl call and native declaration elsewhere in document
+            const implCall = methodText.match(/([A-Za-z_$]\w*Impl)\s*\(/);
+            if (implCall) {
+                const implName = implCall[1];
+                const found = this.findNativeDeclarationByName(document, implName);
+                if (found) {
+                    const returnType = found.returnType;
+                    const methodName = implName;
+                    const parametersStr = found.parametersStr;
+                    const className = this.extractClassName(document);
+                    const packageName = this.extractPackageName(document);
+                    const parameters = this.parseParameters(parametersStr);
+                    const jniSignature = this.generateJniSignature(packageName, className, methodName);
+                    return { methodName, className, packageName, jniSignature, parameters, returnType };
+                }
+            }
+            return null;
+        }
+
         const returnType = match[1];
         const methodName = match[2];
         const parametersStr = match[3];
-        
+
         // Extract class and package information
         const className = this.extractClassName(document);
         const packageName = this.extractPackageName(document);
-        
+
         // Parse parameters
         const parameters = this.parseParameters(parametersStr);
-        
+
         // Generate JNI signature
         const jniSignature = this.generateJniSignature(packageName, className, methodName);
-        
+
         return {
             methodName,
             className,
@@ -122,6 +168,24 @@ export class NativeMethodMover implements RefactoringOperation {
             parameters,
             returnType
         };
+    }
+
+    // Helper: find a native declaration by its method name in the current document
+    private findNativeDeclarationByName(document: vscode.TextDocument, methodName: string): { returnType: string; parametersStr: string } | null {
+        const text = document.getText();
+        const escaped = methodName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const re = new RegExp(
+            String.raw`^\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*native\s+` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            String.raw`([A-Za-z_$][\w$<>.?]*?(?:\s*\[\s*\])*)\s+` +
+            escaped +
+            String.raw`\s*\(([^)]*)\)\s*;`,
+            'm'
+        );
+        const m = text.match(re);
+        if (!m) return null;
+        return { returnType: m[1], parametersStr: m[2] };
     }
 
     // UPDATED: Package and file selector logic
@@ -335,7 +399,7 @@ export class NativeMethodMover implements RefactoringOperation {
         target: TargetSelection,
         workspaceEdit: vscode.WorkspaceEdit
     ): Promise<void> {
-        // Find corresponding C++ files
+        // Find corresponding C/C++ source and header files
         const cppFiles = await this.findCppFiles(context.workspaceFolder);
         
         for (const cppFile of cppFiles) {
@@ -355,11 +419,9 @@ export class NativeMethodMover implements RefactoringOperation {
                 methodInfo.methodName
             );
             
-            // Replace JNI function signatures
-            const updatedContent = content.replace(
-                new RegExp(`Java_${oldJniName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}`, 'g'),
-                `Java_${newJniName}`
-            );
+            // Replace JNI function signatures (Java_qualifiedName_method) across impl and headers
+            const escapedOld = oldJniName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+            const updatedContent = content.replace(new RegExp(`Java_${escapedOld}`, 'g'), `Java_${newJniName}`);
             
             if (updatedContent !== content) {
                 const fullRange = new vscode.Range(
@@ -500,8 +562,9 @@ export class NativeMethodMover implements RefactoringOperation {
     }
 
     private async findCppFiles(workspaceFolder: vscode.WorkspaceFolder): Promise<vscode.Uri[]> {
-        const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c}');
-        return cppFiles;
+        // Include headers too, as some projects declare JNI symbols in .h/.hpp
+        const files = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
+        return files;
     }
 
     private async previewJavaChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{file: string; oldContent: string; newContent: string; diff: string}>> {

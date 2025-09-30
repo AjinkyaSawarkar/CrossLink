@@ -1,6 +1,7 @@
 // src/extension.ts
 import * as vscode from 'vscode';
 import { DependencyAnalyzer } from './core/dependencyAnalyzer';
+import { setAnalyzer } from './core/serviceRegistry';
 import { DependencyTreeProvider } from './visualizer/dependencyTreeProvider';
 import { WebviewProvider } from './visualizer/webviewProvider';
 import { FileWatcher } from './watchers/fileWatcher';
@@ -21,6 +22,8 @@ import { LibraryHighlighter } from './features/libraryHighlighter';
 
 export function activate(context: vscode.ExtensionContext) {
     const analyzer = new DependencyAnalyzer();
+    // Expose analyzer globally for fast JNI lookups (used by highlighter, etc.)
+    setAnalyzer(analyzer);
     const treeProvider = new DependencyTreeProvider(analyzer);
     const webviewProvider = new WebviewProvider(context, analyzer);
     const fileWatcher = new FileWatcher(analyzer, treeProvider);
@@ -72,6 +75,53 @@ context.subscriptions.push(
         'dependencyVisualizer.showConstantsAnalysis',
         async () => {
             await constantsWebviewProvider.showConstantsAnalysis();
+        }
+    );
+
+    // Create a status bar item for JNI Index
+    const jniStatusBar = vscode.window.createStatusBarItem(vscode.StatusBarAlignment.Left, 100);
+    jniStatusBar.command = 'dependencyVisualizer.rebuildJniIndex';
+    jniStatusBar.tooltip = 'Click to rebuild JNI Index';
+    jniStatusBar.text = 'JNI Index: —';
+    jniStatusBar.show();
+
+    const updateJniStatusBar = () => {
+        try {
+            const stats = analyzer.getJniIndexStats();
+            jniStatusBar.text = `JNI Index: ${stats.symbols}`;
+            jniStatusBar.tooltip = `JNI Index: ${stats.symbols} symbols across ${stats.files} hits (Click to rebuild)`;
+        } catch {
+            jniStatusBar.text = 'JNI Index: —';
+        }
+    };
+    updateJniStatusBar();
+
+    // JNI Index commands
+    const rebuildJniIndexCommand = vscode.commands.registerCommand(
+        'dependencyVisualizer.rebuildJniIndex',
+        async () => {
+            await vscode.window.withProgress({
+                location: vscode.ProgressLocation.Notification,
+                title: 'Rebuilding JNI Index...'
+            }, async (progress) => {
+                progress.report({ message: 'Scanning C/C++ sources and headers' });
+                const stats = await analyzer.rebuildJniIndex();
+                vscode.window.showInformationMessage(`JNI index rebuilt: ${stats.symbols} symbols across ${stats.files} hits`);
+
+                // Refresh views dependent on JNI connections
+                try { await enhancedFileConnectionListProvider.updateConnections(); } catch {}
+                try { statisticsProvider.updateStatistics(); } catch {}
+                try { await webviewProvider.updateWebview(); } catch {}
+                updateJniStatusBar();
+            });
+        }
+    );
+
+    const showJniIndexStatsCommand = vscode.commands.registerCommand(
+        'dependencyVisualizer.showJniIndexStats',
+        async () => {
+            const stats = analyzer.getJniIndexStats();
+            vscode.window.showInformationMessage(`JNI Index Stats: ${stats.symbols} symbols, ${stats.files} hits`);
         }
     );
 
@@ -639,6 +689,8 @@ context.subscriptions.push(
         searchCommand,
         filterCommand,
         groupByCommand,
+        rebuildJniIndexCommand,
+        showJniIndexStatsCommand,
         generateStubCommand,
         refreshAllCommand,
         
@@ -658,7 +710,8 @@ context.subscriptions.push(
         
         // Watchers
         fileWatcher,
-        connectionFileWatcher
+        connectionFileWatcher,
+        jniStatusBar
     );
 }
 

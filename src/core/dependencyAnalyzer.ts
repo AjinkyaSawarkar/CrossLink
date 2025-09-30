@@ -39,6 +39,8 @@ export class DependencyAnalyzer {
     private platformChecker = new PlatformChecker();
     private projects: ProjectInfo[] = [];
     private diagnostics: vscode.Diagnostic[] = [];
+    // Cache for JNI symbol index across a single analysis pass
+    private jniIndex: Map<string, Set<string>> | null = null; // symbol -> set of file paths
 
     async analyzeDependencies(workspacePath: string): Promise<ProjectInfo[]> {
         this.projects = [];
@@ -66,6 +68,19 @@ export class DependencyAnalyzer {
         await this.analyzeIssues();
 
         return this.projects;
+    }
+
+    // Public API: rebuild the JNI index on demand
+    async rebuildJniIndex(): Promise<{ symbols: number; files: number }> {
+        this.jniIndex = await this.buildJniSymbolIndex();
+        return this.getJniIndexStats();
+    }
+
+    // Public API: quick stats of current index
+    getJniIndexStats(): { symbols: number; files: number } {
+        const symbols = this.jniIndex ? this.jniIndex.size : 0;
+        const files = this.jniIndex ? Array.from(this.jniIndex.values()).reduce((acc, s) => acc + s.size, 0) : 0;
+        return { symbols, files };
     }
 
     private async findJavaProjects(workspacePath: string): Promise<string[]> {
@@ -264,73 +279,162 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
      // Make sure this method exists and returns FileConnection[]
     async getFileConnections(): Promise<FileConnection[]> {
         const connections: FileConnection[] = [];
-        
-        console.log('Starting file connection analysis...');
-        
-        // Find Java files with native methods
+
+        console.log('Starting file connection analysis (optimized)...');
+
+        // 1) Build JNI symbol index once (Java_qualified_Class_method[__overload]) -> file paths
+        if (!this.jniIndex) {
+            this.jniIndex = await this.buildJniSymbolIndex();
+        }
+        const indexSize = Array.from(this.jniIndex.values()).reduce((acc, s) => acc + s.size, 0);
+        console.log(`JNI index built: ${this.jniIndex.size} symbols across ${indexSize} hits`);
+
+        // 2) Find Java files and extract native methods
         const javaFiles = await vscode.workspace.findFiles('**/*.java');
         console.log(`Found ${javaFiles.length} Java files`);
-        
-        for (const javaFile of javaFiles) {
-            const javaDoc = await vscode.workspace.openTextDocument(javaFile);
-            const nativeMethods = this.extractNativeMethods(javaDoc);
-            console.log(`Extracted ${nativeMethods.length} native methods from ${javaFile.fsPath}`);
-            
-            for (const method of nativeMethods) {
-                const cppMatch = await this.findMatchingCppImplementation(method);
-                connections.push({
-                    javaFile: javaFile.fsPath,
-                    cppFile: cppMatch ? cppMatch.file : 'Not found',
-                    methodName: method.methodName,
-                    isMatched: !!cppMatch,
-                    details: cppMatch ? 'Matched' : 'No C++ implementation found'
-                });
+
+        // Process Java files with limited concurrency to avoid UI stalls
+        const cfg = vscode.workspace.getConfiguration('dependencyVisualizer');
+        const concurrency = Math.max(2, Math.min(16, cfg.get<number>('jni.indexConcurrency') ?? 8));
+        let i = 0;
+        const runNext = async (): Promise<void> => {
+            if (i >= javaFiles.length) return;
+            const file = javaFiles[i++];
+            try {
+                const javaDoc = await vscode.workspace.openTextDocument(file);
+                const nativeMethods = this.extractNativeMethods(javaDoc);
+                if (nativeMethods.length === 0) return runNext();
+
+                for (const method of nativeMethods) {
+                    const match = this.lookupInJniIndex(method);
+                    connections.push({
+                        javaFile: file.fsPath,
+                        cppFile: match ?? 'Not found',
+                        methodName: method.methodName,
+                        isMatched: !!match,
+                        details: match ? 'Matched (indexed)' : 'No C++ implementation found'
+                    });
+                }
+            } catch (err) {
+                console.warn(`Failed processing ${file.fsPath}:`, err);
             }
-        }
-        
-        console.log(`Found ${connections.length} connections`);
+            return runNext();
+        };
+
+        await Promise.all(Array.from({ length: Math.min(concurrency, javaFiles.length) }, () => runNext()));
+
+        console.log(`Found ${connections.length} connections (optimized)`);
         return connections;
     }
 
     // Add these helper methods if they don't exist
     private extractNativeMethods(document: vscode.TextDocument): Array<{ methodName: string; className: string; packageName: string }> {
         const content = document.getText();
-        const methods = [];
-        const nativeRegex = /native\s+\w+\s+(\w+)\s*\(/g;
-        let match;
-        while ((match = nativeRegex.exec(content)) !== null) {
+        const methods: Array<{ methodName: string; className: string; packageName: string }> = [];
+
+        // Line-based scanner tolerant to annotations and modifier order
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            if (!/\bnative\b/.test(lines[i])) continue;
+
+            let decl = lines[i];
+            let endLine = i;
+            const isTerminator = (s: string) => s.includes(';') || s.includes('{');
+            while (endLine < lines.length && !isTerminator(lines[endLine])) {
+                endLine++;
+                if (endLine < lines.length) decl += '\n' + lines[endLine];
+            }
+            if (endLine >= lines.length) break;
+            if (!decl.includes('(')) continue;
+
+            // Flexible signature pattern: native among modifiers, capture method name as last identifier before '('
+            const sigMatch = decl.match(/\bnative\b[\s\w@<>,\[\].()?]*?([A-Za-z_$][\w\[\]<>.?$]*)\s+([A-Za-z_$]\w*)\s*\(/);
+            if (!sigMatch) continue;
+            const methodName = sigMatch[2];
+
             methods.push({
-                methodName: match[1],
+                methodName,
                 className: this.extractClassName(document),
                 packageName: this.extractPackageName(document)
             });
         }
+        
+        // Fallback: robust global regex
+        if (methods.length === 0) {
+            const regex = /^(?:\s*@[\w.]+(?:\([^)]*\))?\s*)*(?:\s*(?:public|private|protected|static|final|abstract|strictfp|synchronized|native)\s+)+\s*(?:<[^>]+>\s*)?([A-Za-z_$][\w\[\]<>.?$]*)\s+([A-Za-z_$]\w*)\s*\([^;{)]*\)\s*;/gm;
+            let m: RegExpExecArray | null;
+            while ((m = regex.exec(content)) !== null) {
+                methods.push({
+                    methodName: m[2],
+                    className: this.extractClassName(document),
+                    packageName: this.extractPackageName(document)
+                });
+            }
+        }
+
         return methods;
     }
 
     private async findMatchingCppImplementation(method: { methodName: string; className: string; packageName: string }): Promise<{ file: string } | null> {
-        const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
-        
-        // Build expected JNI prefix (handling empty package name)
-        let expectedPrefix = 'Java_';
-        if (method.packageName) {
-            expectedPrefix += `${method.packageName.replace(/\./g, '_')}_`;
+        // Use the in-memory index if available for O(1) lookup
+        const match = this.lookupInJniIndex(method);
+        return match ? { file: match } : null;
+    }
+
+    private lookupInJniIndex(method: { methodName: string; className: string; packageName: string }): string | null {
+        if (!this.jniIndex) return null;
+        let expected = 'Java_';
+        if (method.packageName) expected += method.packageName.replace(/\./g, '_') + '_';
+        expected += `${method.className}_${method.methodName}`;
+
+        // 1) Exact match
+        if (this.jniIndex.has(expected)) {
+            const files = this.jniIndex.get(expected)!;
+            return files.values().next().value ?? null;
         }
-        expectedPrefix += `${method.className}_${method.methodName}`;
-        
-        const regex = new RegExp(`JNIEXPORT\\s+\\w+\\s+JNICALL\\s+${expectedPrefix}\\b`, 'g');
-        
-        for (const cppFile of cppFiles) {
-            const cppDoc = await vscode.workspace.openTextDocument(cppFile);
-            const content = cppDoc.getText();
-            if (regex.test(content)) {
-                console.log(`Match found in ${cppFile.fsPath} for prefix ${expectedPrefix}`);
-                return { file: cppFile.fsPath };
-            }
+        // 2) Overloaded matches: any symbol starting with expected + '__'
+        const overloaded = Array.from(this.jniIndex.keys()).filter(k => k.startsWith(expected + '__'));
+        if (overloaded.length > 0) {
+            const files = this.jniIndex.get(overloaded[0]);
+            if (files && files.size > 0) return files.values().next().value as string;
         }
-        
-        console.log(`No match found for prefix ${expectedPrefix}`);
         return null;
+    }
+
+    private async buildJniSymbolIndex(): Promise<Map<string, Set<string>>> {
+        const index = new Map<string, Set<string>>();
+        const query = /Java_([A-Za-z0-9_]+(?:__[-_A-Za-z0-9$]+)?)\s*\(/g;
+        const cfg = vscode.workspace.getConfiguration('dependencyVisualizer');
+        const includeGlobs = cfg.get<string[]>('jni.searchIncludes') ?? ['**/*.{cpp,cc,cxx,c,h,hpp}'];
+        const excludeGlobs = cfg.get<string[]>('jni.searchExcludes') ?? [];
+
+        // Build include and exclude patterns for findFiles
+        const includePattern = includeGlobs.length === 1 ? includeGlobs[0] : `{${includeGlobs.join(',')}}`;
+        const excludePattern = excludeGlobs.length ? `{${excludeGlobs.join(',')}}` : undefined;
+
+        const files = await vscode.workspace.findFiles(includePattern, excludePattern);
+
+        const fsPromises = require('fs').promises as typeof import('fs').promises;
+        const concurrency = 16;
+        let i = 0;
+        const runNext = async (): Promise<void> => {
+            if (i >= files.length) return;
+            const file = files[i++];
+            try {
+                const content = await fsPromises.readFile(file.fsPath, 'utf8');
+                let m: RegExpExecArray | null;
+                while ((m = query.exec(content)) !== null) {
+                    const symbol = 'Java_' + m[1];
+                    if (!index.has(symbol)) index.set(symbol, new Set<string>());
+                    index.get(symbol)!.add(file.fsPath);
+                }
+            } catch {
+                // ignore read errors
+            }
+            return runNext();
+        };
+        await Promise.all(Array.from({ length: Math.min(concurrency, files.length) }, () => runNext()));
+        return index;
     }
 
     private extractClassName(document: vscode.TextDocument): string {
@@ -343,6 +447,24 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
         const content = document.getText();
         const match = content.match(/package\s+([\w.]+);/);
         return match ? match[1] : '';
+    }
+
+    // Public: find JNI implementation by exact expected symbol (optionally with overload handling via index lookup)
+    findJniImplementationByExpected(expectedName: string): string | null {
+        if (!this.jniIndex) return null;
+        if (this.jniIndex.has(expectedName)) {
+            const files = this.jniIndex.get(expectedName)!;
+            const first = files.values().next().value as string | undefined;
+            if (first) return first;
+        }
+        // Try overloads
+        const overloaded = Array.from(this.jniIndex.keys()).find(k => k.startsWith(expectedName + '__'));
+        if (overloaded) {
+            const files = this.jniIndex.get(overloaded)!;
+            const first = files.values().next().value as string | undefined;
+            if (first) return first;
+        }
+        return null;
     }
 
 }

@@ -26,7 +26,9 @@ This document consolidates how the VS Code extension works, its components, comm
 - Conflict/missing/platform issue detection
 - JNI connection analysis (Java native methods ↔ C/C++ JNI functions)
 - Java–C++ file connection list panel
-- Project constants analysis and “apply” refactoring UI
+- Project constants ana
+
+lysis and “apply” refactoring UI
 - Library highlighting for `System.loadLibrary(...)` and native method implementation status
 - Refactorings: rename, move/copy native methods, extract constants, generate JNI C++ stubs
 - Dashboard control panel and statistics view

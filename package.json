@@ -11,7 +11,9 @@
     "onLanguage:java",
     "onLanguage:cpp",
     "onLanguage:c",
-    "onCommand:extension.convertToConstants"
+    "onCommand:extension.convertToConstants",
+    "onCommand:dependencyVisualizer.rebuildJniIndex",
+    "onCommand:dependencyVisualizer.showJniIndexStats"
   ],
   "main": "./out/extension.js",
   "contributes": {
@@ -205,6 +207,18 @@
         "title": "Show Library Information",
         "category": "Dependency Visualizer",
         "icon": "$(info)"
+      },
+      {
+        "command": "dependencyVisualizer.rebuildJniIndex",
+        "title": "Rebuild JNI Index",
+        "category": "Dependency Visualizer",
+        "icon": "$(sync)"
+      },
+      {
+        "command": "dependencyVisualizer.showJniIndexStats",
+        "title": "Show JNI Index Stats",
+        "category": "Dependency Visualizer",
+        "icon": "$(graph)"
       }
     ],
     "keybindings": [
@@ -319,6 +333,25 @@
           "type": "boolean",
           "default": true,
           "description": "Show platform compatibility warnings"
+        },
+        "dependencyVisualizer.jni.searchIncludes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": ["**/*.{cpp,cc,cxx,c,h,hpp}"],
+          "description": "Glob patterns (per workspace folder) to include when indexing JNI symbols (Java_...)."
+        },
+        "dependencyVisualizer.jni.searchExcludes": {
+          "type": "array",
+          "items": { "type": "string" },
+          "default": [],
+          "description": "Glob patterns to exclude from JNI symbol indexing (e.g., vendor folders)."
+        },
+        "dependencyVisualizer.jni.indexConcurrency": {
+          "type": "number",
+          "default": 8,
+          "minimum": 2,
+          "maximum": 16,
+          "description": "Max number of Java files processed concurrently when building Java↔C++ connections."
         }
       }
     }

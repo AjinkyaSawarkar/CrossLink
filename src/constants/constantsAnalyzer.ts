@@ -252,9 +252,40 @@ export class ConstantsAnalyzer {
             }
         }
 
+        // Heuristics for numeric values when rules didn't give enough
+        if (/^-?\d+(?:\.\d+)?$/.test(value)) {
+            const num = parseFloat(value);
+            const lowerCode = context.surroundingCode.toLowerCase();
+            const varHint = (context.variableName || context.functionName || '').toUpperCase();
+            const add = (...arr: string[]) => arr.forEach(s => suggestions.push(toConstCase(s)));
+
+            // Units detection
+            if (/(ms|millisecond)/i.test(lowerCode)) add(varHint ? `${varHint}_MS` : 'TIMEOUT_MS', 'DURATION_MS');
+            if (/(sec|second)/i.test(lowerCode)) add(varHint ? `${varHint}_SECONDS` : 'SECONDS');
+            if (/(kb|kilobyte)/i.test(lowerCode)) add('KILOBYTES');
+            if (/(mb|megabyte)/i.test(lowerCode)) add('MEGABYTES');
+            if (/(px|pixel)/i.test(lowerCode)) add(varHint ? `${varHint}_PX` : 'PIXELS');
+
+            // Power-of-two buffer sizes
+            const isInt = Number.isInteger(num);
+            if (isInt && num > 0 && (num & (num - 1)) === 0) {
+                add('BUFFER_SIZE', 'CAPACITY', 'PAGE_SIZE');
+            }
+
+            // Negative and sentinel values
+            if (num < 0) add('NEGATIVE_VALUE', 'SENTINEL_VALUE');
+            if (num === 0) add('ZERO_VALUE');
+            if (num === 1) add('ONE_VALUE');
+
+            // Context-driven suffix
+            if (varHint) {
+                add(`${varHint}_VALUE`, `${varHint}_LIMIT`, `${varHint}_COUNT`);
+            }
+        }
+
         // Remove duplicates and sort by length (shorter names first)
-        const uniqueSuggestions = [...new Set(suggestions)].sort((a, b) => a.length - b.length);
-        
+        const uniqueSuggestions = [...new Set(suggestions)].filter(Boolean).sort((a, b) => a.length - b.length);
+
         return {
             suggestions: uniqueSuggestions.slice(0, 5), // Limit to top 5 suggestions
             confidence
@@ -583,6 +614,15 @@ class NamingRule {
     ) {}
 }
 
+// Convert free-form text to SCREAMING_SNAKE_CASE constant style
+function toConstCase(text: string): string {
+    if (!text) return '';
+    return text
+        .replace(/([a-z])([A-Z])/g, '$1_$2')
+        .replace(/[^A-Za-z0-9]+/g, '_')
+        .replace(/^_+|_+$/g, '')
+        .toUpperCase();
+}
 
 /**
  * Scan a workspace for magic numbers.

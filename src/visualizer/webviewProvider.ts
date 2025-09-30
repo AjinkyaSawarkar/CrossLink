@@ -32,11 +32,22 @@ export class WebviewProvider {
             this.panel = undefined;
         });
 
-        // Send data to webview
-        this.updateWebview();
+        // Reverted: no message handling for node click actions
+
+        // If no projects analyzed yet, try to analyze once to populate graph
+        try {
+            const folders = vscode.workspace.workspaceFolders;
+            if (folders && this.analyzer.getProjects().length === 0) {
+                this.analyzer.analyzeDependencies(folders[0].uri.fsPath).then(() => this.updateWebview());
+            } else {
+                this.updateWebview();
+            }
+        } catch {
+            this.updateWebview();
+        }
     }
 
-    private async updateWebview(): Promise<void> {
+    async updateWebview(): Promise<void> {
         if (!this.panel) return;
 
         const projects = this.analyzer.getProjects();
@@ -221,6 +232,23 @@ export class WebviewProvider {
         .controls {
             display: flex;
             gap: 10px;
+        }
+
+        .hover-banner {
+            margin-left: 10px;
+            padding: 6px 10px;
+            background: var(--vscode-editorWidget-background);
+            color: var(--vscode-editorWidget-foreground);
+            border: 1px solid var(--vscode-editorWidget-border);
+            border-radius: 6px;
+            font-size: 12px;
+            max-width: 50vw;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            display: inline-block; /* reserve space to avoid reflow */
+            min-width: 200px;
+            visibility: hidden; /* toggle visibility instead of layout */
         }
 
         .control-btn {
@@ -448,6 +476,9 @@ export class WebviewProvider {
             display: none;
             z-index: 1000;
             pointer-events: none;
+            max-width: 700px;
+            word-break: break-all;
+            white-space: normal;
         }
 
         .tooltip.visible {
@@ -647,6 +678,7 @@ export class WebviewProvider {
                     <button class="control-btn" id="zoomOut">🔍 Zoom Out</button>
                     <button class="control-btn" id="resetZoom">🎯 Reset</button>
                     <button class="control-btn" id="exportGraph">💾 Export</button>
+                    <div class="hover-banner" id="hoverBanner" title="Full path appears here on hover"></div>
                 </div>
             </div>
             
@@ -688,6 +720,7 @@ export class WebviewProvider {
     </div>
 
     <script>
+        const vscode = acquireVsCodeApi();
         const svg = d3.select("#graph");
         const width = window.innerWidth - 280;
         const height = window.innerHeight - 60;
@@ -774,9 +807,27 @@ export class WebviewProvider {
                         .on("start", dragstarted)
                         .on("drag", dragged)
                         .on("end", dragended))
-                    .on("mouseenter", function(event, d) { showTooltip(event, d); })
+                    .on("mouseenter", function(event, d) { 
+                        // Cancel any pending unpin
+                        if (unpinTimer) { clearTimeout(unpinTimer); unpinTimer = null; }
+                        // Pin the node so it doesn't move while reading tooltip/banner
+                        hoveredNodeId = d.id;
+                        d.fx = d.x; d.fy = d.y;
+                        d.vx = 0; d.vy = 0;
+                        simulation.alphaTarget(0); // do not restart to avoid jiggle
+                        showTooltip(event, d);
+                    })
                     .on("mousemove", function(event, d) { showTooltip(event, d); })
-                    .on("mouseleave", function() { hideTooltip(); });
+                    .on("mouseleave", function(event, d) { 
+                        // Unpin after a short delay to reduce flicker when moving toward banner
+                        const nodeRef = d;
+                        unpinTimer = setTimeout(() => {
+                            if (hoveredNodeId === nodeRef.id) hoveredNodeId = null;
+                            nodeRef.fx = null; nodeRef.fy = null;
+                            simulation.alphaTarget(0.02);
+                        }, 1000);
+                        hideTooltip();
+                    });
                 
                 const label = graphGroup.append("g")
                     .selectAll("text")
@@ -803,8 +854,14 @@ export class WebviewProvider {
                         .attr("y2", d => d.target.y);
                     
                     node
-                        .attr("cx", d => d.x)
-                        .attr("cy", d => d.y);
+                        .attr("cx", d => {
+                            if (hoveredNodeId && d.id === hoveredNodeId && d.fx != null) { d.x = d.fx; d.vx = 0; }
+                            return d.x;
+                        })
+                        .attr("cy", d => {
+                            if (hoveredNodeId && d.id === hoveredNodeId && d.fy != null) { d.y = d.fy; d.vy = 0; }
+                            return d.y;
+                        });
                     
                     label
                         .attr("x", d => d.x)
@@ -819,12 +876,32 @@ export class WebviewProvider {
             }, 500);
         }
         
+        let hoveredNodeId = null;
+        let unpinTimer = null;
+
         function showTooltip(event, d) {
             const tooltip = document.getElementById('tooltip');
             const title = tooltip.querySelector('.tooltip-title');
             const details = tooltip.querySelector('.tooltip-details');
+            const banner = document.getElementById('hoverBanner');
             
-            title.textContent = d.name;
+            // Use full path for file nodes so long names are fully visible
+            if (d.type === 'file' && d.fullPath) {
+                title.textContent = d.fullPath;
+                // Also set stable banner in header that doesn't move with cursor
+                if (banner) {
+                    banner.textContent = d.fullPath;
+                    banner.setAttribute('title', d.fullPath);
+                    banner.style.visibility = 'visible';
+                }
+            } else {
+                title.textContent = d.name;
+                if (banner) {
+                    banner.textContent = d.name;
+                    banner.setAttribute('title', d.name);
+                    banner.style.visibility = 'visible';
+                }
+            }
             
             let detailsHTML = '';
             if (d.type === 'project') {
@@ -860,8 +937,57 @@ export class WebviewProvider {
         
         function hideTooltip() {
             document.getElementById('tooltip').classList.remove('visible');
+            const banner = document.getElementById('hoverBanner');
+            if (banner) {
+                banner.style.visibility = 'hidden';
+                banner.textContent = '';
+                banner.removeAttribute('title');
+            }
         }
-        
+
+        // Receive data from extension and update graph
+        window.addEventListener('message', event => {
+            const msg = event.data;
+            if (msg && msg.command === 'updateGraph') {
+                updateGraph(msg.data);
+            }
+        });
+        // Search filtering for nodes/links
+        const searchBox = document.getElementById('searchBox');
+        if (searchBox) {
+            // Live filter (fade non-matching)
+            searchBox.addEventListener('input', function() {
+                const term = this.value.toLowerCase();
+                const matchNode = n => !term || (n.name && n.name.toLowerCase().includes(term)) || (n.fullPath && n.fullPath.toLowerCase().includes(term));
+                const matchedIds = new Set(nodes.filter(matchNode).map(n => n.id));
+
+                // Fade nodes
+                graphGroup.selectAll('circle')
+                    .classed('faded', d => !matchNode(d));
+
+                // Fade labels
+                graphGroup.selectAll('text.node-label')
+                    .classed('faded', d => !matchNode(d));
+
+                // Fade links where neither end matches
+                graphGroup.selectAll('line')
+                    .classed('faded', l => !(matchedIds.has(l.source.id ?? l.source) || matchedIds.has(l.target.id ?? l.target)));
+            });
+
+            // Enter-to-focus
+            searchBox.addEventListener('keydown', function(e) {
+                if (e.key === 'Enter') {
+                    const term = this.value.toLowerCase();
+                    const match = nodes.find(n => n.name && n.name.toLowerCase().includes(term));
+                    if (match) {
+                        applyFocus(match.id);
+                        const t = d3.zoomIdentity.translate(width/2 - (match.x||0), height/2 - (match.y||0)).scale(1.2);
+                        svg.transition().duration(300).call(zoomBehavior.transform, t);
+                    }
+                }
+            });
+        }
+
         function getStatusText(status) {
             switch(status) {
                 case 'ok': return '✅ Healthy';
@@ -907,32 +1033,7 @@ export class WebviewProvider {
             alert('Export functionality to be implemented');
         });
         
-        // Search functionality (live dim + Enter to focus first match)
-        const searchBox = document.getElementById('searchBox');
-        searchBox.addEventListener('input', function(e) {
-            const searchTerm = e.target.value.toLowerCase();
-            
-            graphGroup.selectAll('.node')
-                .style('opacity', d => {
-                    return searchTerm === '' || d.name.toLowerCase().includes(searchTerm) ? 1 : 0.3;
-                });
-            
-            graphGroup.selectAll('.node-label')
-                .style('opacity', d => {
-                    return searchTerm === '' || d.name.toLowerCase().includes(searchTerm) ? 1 : 0.3;
-                });
-        });
-        searchBox.addEventListener('keydown', function(e) {
-            if (e.key === 'Enter') {
-                const term = e.target.value.toLowerCase();
-                const match = nodes.find(n => n.name.toLowerCase().includes(term));
-                if (match) {
-                    applyFocus(match.id);
-                    const t = d3.zoomIdentity.translate(width/2 - (match.x||0), height/2 - (match.y||0)).scale(1.2);
-                    svg.transition().duration(300).call(zoomBehavior.transform, t);
-                }
-            }
-        });
+        // (Removed duplicate searchBox declaration and listeners to avoid redefinition errors)
 
         // Filters (hide cross by default). Also hide nodes with no visible links.
         function applyFilters() {

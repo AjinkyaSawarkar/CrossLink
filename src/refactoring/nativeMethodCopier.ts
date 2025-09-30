@@ -32,13 +32,13 @@ export class NativeMethodCopier implements RefactoringOperation {
         if (context.language !== 'java') {
             return false;
         }
-        
         const document = context.document;
         const position = context.selection.active;
-        const line = document.lineAt(position.line);
-        
-        // Check if current line contains 'native' keyword
-        return line.text.includes('native') && line.text.includes('(');
+        const line = document.lineAt(position.line).text;
+        if (line.includes('native') && line.includes('(')) return true;
+        // Also allow wrapper methods calling *Impl(...)
+        if (/\b\w+Impl\s*\(/.test(line)) return true;
+        return false;
     }
 
     async apply(context: RefactoringContext): Promise<vscode.WorkspaceEdit> {
@@ -95,10 +95,62 @@ export class NativeMethodCopier implements RefactoringOperation {
         const methodText = document.getText(methodRange);
         
         // Parse native method signature
-        const nativeMethodRegex = /(?:public|private|protected)?\s*(?:static\s+)?native\s+(\w+)\s+(\w+)\s*\(([^)]*)\)\s*;/;
-        const match = methodText.match(nativeMethodRegex);
+        // Allow flexible modifier order (e.g., 'native private', annotations, generics, arrays)
+        const nativeMethodRegex = new RegExp(
+            String.raw`^\s*` +
+            String.raw`(?:@[\w.]+(?:\([^)]*\))?\s*)*` +
+            // Require 'native' among modifiers, allow any order around it
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            String.raw`native\s+` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            // Return type (generics allowed) and optional spaced array suffixes
+            String.raw`([A-Za-z_$][\w$<>.?]*?(?:\s*\[\s*\])*)\s+` +
+            // Method name
+            String.raw`([A-Za-z_$]\w*)\s*` +
+            // Params
+            String.raw`\(([^)]*)\)\s*;`,
+            'm'
+        );
+        let match = methodText.match(nativeMethodRegex);
         
+        // Fallback: search a nearby window around the cursor with a looser pattern if strict match fails
         if (!match) {
+            const docText = document.getText();
+            const pos = document.offsetAt(methodRange.start);
+            const windowStart = Math.max(0, pos - 1000);
+            const windowEnd = Math.min(docText.length, pos + 2000);
+            const windowText = docText.slice(windowStart, windowEnd);
+            const looseRegex = /native[\s\w@<>,\[\].$?]*?([A-Za-z_$][\w$<>.?]*(?:\s*\[\s*\])*)\s+([A-Za-z_$]\w*)\s*\(([^)]*)\)\s*;/m;
+            const looseMatch = windowText.match(looseRegex);
+            if (looseMatch) {
+                match = looseMatch as any;
+            }
+        }
+
+        if (!match) {
+            // Fallback 2: if cursor is on a wrapper method, detect call to *Impl(...) and find native decl by that name
+            const implCall = methodText.match(/([A-Za-z_$]\w*Impl)\s*\(/);
+            if (implCall) {
+                const implName = implCall[1];
+                const found = this.findNativeDeclarationByName(document, implName);
+                if (found) {
+                    const { returnType: rt, parametersStr: ps } = found;
+                    const className = this.extractClassName(document);
+                    const packageName = this.extractPackageName(document);
+                    const parameters = this.parseParameters(ps);
+                    const jniSignature = this.generateJniSignature(packageName, className, implName);
+                    return {
+                        methodName: implName,
+                        className,
+                        packageName,
+                        jniSignature,
+                        parameters,
+                        returnType: rt,
+                        fullMethodSignature: `native ${rt} ${implName}(${ps});`,
+                        methodBody: `native ${rt} ${implName}(${ps});`
+                    };
+                }
+            }
             return null;
         }
         
@@ -128,38 +180,69 @@ export class NativeMethodCopier implements RefactoringOperation {
         };
     }
 
+    // Helper: find a native declaration by method name anywhere in the document
+    private findNativeDeclarationByName(
+        document: vscode.TextDocument,
+        methodName: string
+    ): { returnType: string; parametersStr: string } | null {
+        const text = document.getText();
+        const escaped = methodName.replace(/[-\/\\^$*+?.()|[\]{}]/g, '\\$&');
+        const re = new RegExp(
+            String.raw`^\s*(?:@[\w.]+(?:\([^)]*\))?\s*)*` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*native\s+` +
+            String.raw`(?:(?:public|private|protected|static|final|abstract|strictfp|synchronized)\s+)*` +
+            String.raw`([A-Za-z_$][\w$<>.?]*?(?:\s*\[\s*\])*)\s+` +
+            escaped +
+            String.raw`\s*\(([^)]*)\)\s*;`,
+            'm'
+        );
+        const m = text.match(re);
+        if (!m) return null;
+        return { returnType: m[1], parametersStr: m[2] };
+    }
+
     private async findMethodRange(document: vscode.TextDocument, position: vscode.Position): Promise<vscode.Range | null> {
-        // Look for the method signature that contains 'native'
+        // Locate the native method declaration that the cursor is on or nearest to
         const text = document.getText();
         const lines = text.split('\n');
-        
-        for (let i = Math.max(0, position.line - 5); i <= Math.min(lines.length - 1, position.line + 5); i++) {
-            const line = lines[i];
-            if (line.includes('native') && line.includes('(')) {
-                // Find the end of the method declaration (semicolon)
-                let endLine = i;
-                let endChar = line.indexOf(';');
-                
-                if (endChar === -1) {
-                    // Method declaration spans multiple lines
-                    for (let j = i + 1; j < lines.length; j++) {
-                        endChar = lines[j].indexOf(';');
-                        if (endChar !== -1) {
-                            endLine = j;
-                            break;
-                        }
-                    }
-                }
-                
-                if (endChar !== -1) {
-                    return new vscode.Range(
-                        new vscode.Position(i, 0),
-                        new vscode.Position(endLine, endChar + 1)
-                    );
-                }
+
+        // Try to find a native declaration on or near the cursor
+        let startLine = position.line;
+        while (startLine > 0 && !lines[startLine].includes('native')) {
+            startLine--;
+        }
+
+        if (lines[startLine] && lines[startLine].includes('native')) {
+            // Find the end of the method declaration (semicolon), scanning forward
+            let endLine = startLine;
+            while (endLine < lines.length && !lines[endLine].includes(';')) {
+                endLine++;
+            }
+            if (endLine >= lines.length) return null;
+            const endChar = lines[endLine].indexOf(';');
+            if (endChar === -1) return null;
+            return new vscode.Range(new vscode.Position(startLine, 0), new vscode.Position(endLine, endChar + 1));
+        }
+
+        // Wrapper fallback: detect call to *Impl(...) on the current method and locate its native declaration range
+        // Search a small window around the cursor for *Impl call
+        const windowStart = Math.max(0, position.line - 10);
+        const windowEnd = Math.min(lines.length - 1, position.line + 10);
+        const windowText = lines.slice(windowStart, windowEnd + 1).join('\n');
+        const implCall = windowText.match(/([A-Za-z_$]\w*Impl)\s*\(/);
+        if (implCall) {
+            const implName = implCall[1];
+            // Find native declaration line for implName anywhere in the document
+            const declRegex = new RegExp(`^.*native\\s+[^;]*?\\b${implName}\\s*\\([^)]*\\)\\s*;`, 'm');
+            const declMatch = text.match(declRegex);
+            if (declMatch) {
+                const idx = declMatch.index || 0;
+                const startPos = document.positionAt(idx);
+                const endPos = document.positionAt(idx + declMatch[0].length);
+                return new vscode.Range(startPos, endPos);
             }
         }
-        
+
         return null;
     }
 
@@ -453,10 +536,23 @@ JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
             'float': 'jfloat',
             'double': 'jdouble',
             'String': 'jstring',
-            'Object': 'jobject'
+            'Object': 'jobject',
+            // Primitive arrays
+            'boolean[]': 'jbooleanArray',
+            'byte[]': 'jbyteArray',
+            'char[]': 'jcharArray',
+            'short[]': 'jshortArray',
+            'int[]': 'jintArray',
+            'long[]': 'jlongArray',
+            'float[]': 'jfloatArray',
+            'double[]': 'jdoubleArray',
+            // Common object arrays
+            'String[]': 'jobjectArray',
+            'Object[]': 'jobjectArray'
         };
-        
-        return typeMap[javaType] || 'jobject';
+        // Normalize spacing (e.g., 'long []' -> 'long[]')
+        const norm = javaType.replace(/\s*\[\s*\]/g, '[]');
+        return typeMap[norm] || (norm.endsWith('[]') ? 'jobjectArray' : 'jobject');
     }
 
     private generateDefaultReturn(jniReturnType: string): string {
@@ -474,9 +570,18 @@ JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
             'jfloat': 'return 0.0f;',
             'jdouble': 'return 0.0;',
             'jstring': 'return env->NewStringUTF("");',
-            'jobject': 'return nullptr;'
+            'jobject': 'return nullptr;',
+            // Arrays default to null
+            'jbooleanArray': 'return nullptr;',
+            'jbyteArray': 'return nullptr;',
+            'jcharArray': 'return nullptr;',
+            'jshortArray': 'return nullptr;',
+            'jintArray': 'return nullptr;',
+            'jlongArray': 'return nullptr;',
+            'jfloatArray': 'return nullptr;',
+            'jdoubleArray': 'return nullptr;',
+            'jobjectArray': 'return nullptr;'
         };
-        
         return defaultValues[jniReturnType] || 'return nullptr;';
     }
 }

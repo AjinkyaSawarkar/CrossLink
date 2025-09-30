@@ -2,6 +2,7 @@ import * as vscode from 'vscode';
 import * as fs from 'fs';
 import * as path from 'path';
 import * as os from 'os';
+import { getAnalyzer } from '../core/serviceRegistry';
 
 export interface LibraryInfo {
     name: string;
@@ -28,16 +29,36 @@ export interface NativeMethodInfo {
 export class LibraryHighlighter {
     private decorationTypes: Map<string, vscode.TextEditorDecorationType> = new Map();
     private currentPlatform: string;
+    private refreshTimers: Map<string, NodeJS.Timeout> = new Map();
 
     constructor() {
         this.currentPlatform = os.platform();
         this.initializeDecorationTypes();
     }
 
+    private scheduleHighlight(document: vscode.TextDocument, delayMs: number = 250): void {
+        const key = document.uri.toString();
+        const existing = this.refreshTimers.get(key);
+        if (existing) {
+            clearTimeout(existing);
+        }
+        const timer = setTimeout(async () => {
+            try {
+                const editor = vscode.window.visibleTextEditors.find(e => e.document === document);
+                if (editor) {
+                    await this.highlightLibrariesInEditor(editor);
+                }
+            } finally {
+                this.refreshTimers.delete(key);
+            }
+        }, delayMs);
+        this.refreshTimers.set(key, timer);
+    }
+
     private initializeDecorationTypes(): void {
         // Red for missing files - Beautiful error styling
         this.decorationTypes.set('missing', vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(244, 67, 54, 0.15)',
+            backgroundColor: 'rgba(236, 23, 8, 0.15)',
             overviewRulerColor: '#f44336',
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             after: {
@@ -50,7 +71,7 @@ export class LibraryHighlighter {
 
         // Blue for wrong extension - Beautiful warning styling
         this.decorationTypes.set('wrong_extension', vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(33, 150, 243, 0.15)',
+            backgroundColor: 'rgba(35, 156, 255, 0.15)',
             overviewRulerColor: '#2196f3',
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             after: {
@@ -63,7 +84,7 @@ export class LibraryHighlighter {
 
         // Green for correct files - Beautiful success styling
         this.decorationTypes.set('correct', vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(76, 175, 80, 0.15)',
+            backgroundColor: 'rgba(45, 238, 51, 0.15)',
             overviewRulerColor: '#4caf50',
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             after: {
@@ -76,7 +97,7 @@ export class LibraryHighlighter {
 
         // Green for implemented native methods - Beautiful success styling
         this.decorationTypes.set('implemented', vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(76, 175, 80, 0.15)',
+            backgroundColor: 'rgba(45, 238, 51, 0.15)',
             overviewRulerColor: '#4caf50',
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             after: {
@@ -89,7 +110,7 @@ export class LibraryHighlighter {
 
         // Red for missing native method implementations - Beautiful error styling
         this.decorationTypes.set('missing_implementation', vscode.window.createTextEditorDecorationType({
-            backgroundColor: 'rgba(244, 67, 54, 0.15)',
+            backgroundColor: 'rgba(219, 35, 21, 0.15)',
             overviewRulerColor: '#f44336',
             overviewRulerLane: vscode.OverviewRulerLane.Right,
             after: {
@@ -142,35 +163,23 @@ export class LibraryHighlighter {
         );
 
         // Register event listeners for persistent highlighting
-        const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor(
-            (editor) => {
-                if (editor && editor.document.languageId === 'java') {
-                    this.highlightLibrariesInEditor(editor);
-                }
+        const onDidChangeActiveTextEditor = vscode.window.onDidChangeActiveTextEditor((editor) => {
+            if (editor && editor.document.languageId === 'java') {
+                this.scheduleHighlight(editor.document);
             }
-        );
+        });
 
-        const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument(
-            (event) => {
-                if (event.document.languageId === 'java') {
-                    const editor = vscode.window.activeTextEditor;
-                    if (editor && editor.document === event.document) {
-                        this.highlightLibrariesInEditor(editor);
-                    }
-                }
+        const onDidChangeTextDocument = vscode.workspace.onDidChangeTextDocument((event) => {
+            if (event.document.languageId === 'java') {
+                this.scheduleHighlight(event.document);
             }
-        );
+        });
 
-        const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument(
-            (document) => {
-                if (document.languageId === 'java') {
-                    const editor = vscode.window.activeTextEditor;
-                    if (editor && editor.document === document) {
-                        this.highlightLibrariesInEditor(editor);
-                    }
-                }
+        const onDidOpenTextDocument = vscode.workspace.onDidOpenTextDocument((document) => {
+            if (document.languageId === 'java') {
+                this.scheduleHighlight(document);
             }
-        );
+        });
 
         context.subscriptions.push(
             hoverProvider,
@@ -186,6 +195,12 @@ export class LibraryHighlighter {
 
         // Initial highlight
         this.refreshHighlights();
+
+        // Warm JNI index in background for fast lookups
+        const analyzer = getAnalyzer();
+        if (analyzer) {
+            analyzer.rebuildJniIndex?.().catch(() => {});
+        }
     }
 
     private async provideHover(document: vscode.TextDocument, position: vscode.Position): Promise<vscode.Hover | undefined> {
@@ -327,21 +342,49 @@ export class LibraryHighlighter {
         const className = this.extractClassName(document);
         const packageName = this.extractPackageName(document);
 
-        // Regex to match native method declarations
-        const nativeMethodRegex = /(?:public|private|protected)?\s*native\s+(?:\w+(?:<[^>]+>)?)\s+(\w+)\s*\([^)]*\)\s*;/g;
-        let match;
+        // Robust line-based scanner to capture multi-line native method declarations
+        const lines = content.split('\n');
+        for (let i = 0; i < lines.length; i++) {
+            // Trigger only on the 'native' keyword as a standalone word to avoid matching parameter names like 'native_object'
+            if (!/\bnative\b/.test(lines[i])) continue;
 
-        while ((match = nativeMethodRegex.exec(content)) !== null) {
-            const methodName = match[1];
-            const startPos = document.positionAt(match.index);
-            const endPos = document.positionAt(match.index + match[0].length);
+            // Accumulate declaration until semicolon or opening brace (be tolerant even if '{' appears)
+            const startLine = i;
+            let decl = lines[i];
+            let endLine = i;
+            const isTerminator = (s: string) => s.includes(';') || s.includes('{');
+            while (endLine < lines.length && !isTerminator(lines[endLine])) {
+                endLine++;
+                if (endLine < lines.length) {
+                    decl += '\n' + lines[endLine];
+                }
+            }
+
+            if (endLine >= lines.length) {
+                break; // Malformed/no semicolon
+            }
+
+            // Heuristic: ensure it looks like a method (has '(' before ';')
+            if (!decl.includes('(')) continue;
+
+            // Extract method name using a flexible signature pattern where 'native' can appear among modifiers
+            // Group 1 ~ return type, Group 2 ~ method name
+            const sigMatch = decl.match(/\bnative\b[\s\w@<>,\[\].()?]*?([A-Za-z_][\w\[\]<>.?]*)\s+([A-Za-z_]\w*)\s*\(/);
+            if (!sigMatch) continue;
+            const methodName = sigMatch[2];
+
+            // Compute range positions - start from first non-whitespace to respect indentation
+            const startLineText = lines[startLine] ?? '';
+            const startCol = startLineText.search(/\S|$/); // index of first non-space, or end if blank
+            const startPos = new vscode.Position(startLine, Math.max(0, startCol));
+            const termIdx = lines[endLine].includes(';') ? lines[endLine].indexOf(';') + 1 : lines[endLine].indexOf('{');
+            const endChar = termIdx >= 0 ? termIdx : lines[endLine].length;
+            const endPos = new vscode.Position(endLine, endChar);
             const range = new vscode.Range(startPos, endPos);
 
-            // Find the associated library name (look for System.loadLibrary calls in the same file)
+            // Associated library and JNI signature
             const libraryName = this.findAssociatedLibrary(document);
-
-            // Generate JNI signature
-            const jniSignature = this.generateJNISignature(match[0], className, methodName);
+            const jniSignature = this.generateJNISignature(decl, className, methodName);
 
             const methodInfo: NativeMethodInfo = {
                 methodName,
@@ -356,13 +399,46 @@ export class LibraryHighlighter {
             methods.push({ methodInfo, range });
         }
 
+        // If no methods were found via the line-based scanner, try a robust global regex as fallback
+        if (methods.length === 0) {
+            const regex = /^(?:\s*@[\w.]+(?:\([^)]*\))?\s*)*(?:\s*(?:public|private|protected|static|final|abstract|strictfp|synchronized|native)\s+)+\s*(?:<[^>]+>\s*)?([A-Za-z_$][\w\[\]<>.?$]*)\s+([A-Za-z_$]\w*)\s*\([^;{)]*\)\s*;/gm;
+            let m: RegExpExecArray | null;
+            while ((m = regex.exec(content)) !== null) {
+                const returnType = m[1];
+                const methodName = m[2];
+                const startPos = document.positionAt(m.index);
+                const endPos = document.positionAt(m.index + m[0].length);
+                const range = new vscode.Range(startPos, endPos);
+
+                const libraryName = this.findAssociatedLibrary(document);
+                const jniSignature = this.generateJNISignature(m[0], className, methodName);
+
+                methods.push({
+                    methodInfo: {
+                        methodName,
+                        className,
+                        packageName,
+                        libraryName,
+                        jniSignature,
+                        cppImplementationExists: false,
+                        status: 'missing_implementation'
+                    },
+                    range
+                });
+            }
+        }
+
         return methods;
     }
 
     private extractClassName(document: vscode.TextDocument): string {
         const content = document.getText();
-        const classMatch = content.match(/public\s+class\s+(\w+)/);
-        return classMatch ? classMatch[1] : 'UnknownClass';
+        // Prefer a public class if present
+        const publicMatch = content.match(/\bpublic\s+class\s+(\w+)/);
+        if (publicMatch) return publicMatch[1];
+        // Fallback to any class declaration (top-most occurrence)
+        const anyMatch = content.match(/\bclass\s+(\w+)/);
+        return anyMatch ? anyMatch[1] : 'UnknownClass';
     }
 
     private extractPackageName(document: vscode.TextDocument): string {
@@ -398,17 +474,34 @@ export class LibraryHighlighter {
             expectedFunctionName = `Java_${packagePrefix}_${methodInfo.className}_${methodInfo.methodName}`;
         }
 
-        // First, look for implementation files (.cpp, .cc, .cxx) - these contain the actual implementation
-        const implementationFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx}');
+        // Fast path: consult global JNI index from DependencyAnalyzer (if available)
+        try {
+            const analyzer = getAnalyzer();
+            const found = analyzer?.findJniImplementationByExpected?.(expectedFunctionName) ?? null;
+            if (found) {
+                methodInfo.cppImplementationExists = true;
+                methodInfo.status = 'implemented';
+                methodInfo.implementationFile = found;
+                try {
+                    const doc = await vscode.workspace.openTextDocument(found);
+                    const content = doc.getText();
+                    methodInfo.implementationLine = this.findImplementationLine(content, expectedFunctionName);
+                } catch {}
+                return methodInfo;
+            }
+        } catch {}
+
+        // First, look for implementation files (.cpp, .cc, .cxx, .c) - these contain the actual implementation
+        const implementationFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c}');
         
-        // Search for the JNI function in implementation files first
+        // Slow path: Search for the JNI function in implementation files
         for (const implFile of implementationFiles) {
             try {
                 const implDocument = await vscode.workspace.openTextDocument(implFile);
                 const implContent = implDocument.getText();
                 
-                // Look for JNIEXPORT function with the expected name
-                const jniFunctionRegex = new RegExp(`JNIEXPORT\\s+\\w+\\s+JNICALL\\s+${expectedFunctionName}\\s*\\(`, 'g');
+                // Look for JNI function with the expected name (allow variants without JNIEXPORT/JNICALL and overload suffixes)
+                const jniFunctionRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
                 
                 if (jniFunctionRegex.test(implContent)) {
                     methodInfo.cppImplementationExists = true;
@@ -431,10 +524,10 @@ export class LibraryHighlighter {
                 const headerDocument = await vscode.workspace.openTextDocument(headerFile);
                 const headerContent = headerDocument.getText();
                 
-                // Look for JNIEXPORT function with the expected name
-                const jniFunctionRegex = new RegExp(`JNIEXPORT\\s+\\w+\\s+JNICALL\\s+${expectedFunctionName}\\s*\\(`, 'g');
+                // Look for JNI function declaration with the expected name (allow overload suffixes)
+                const jniDeclRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
                 
-                if (jniFunctionRegex.test(headerContent)) {
+                if (jniDeclRegex.test(headerContent)) {
                     methodInfo.cppImplementationExists = true;
                     methodInfo.status = 'implemented';
                     // Store the header file info for navigation (but mark it as a header)
@@ -454,7 +547,7 @@ export class LibraryHighlighter {
     private findImplementationLine(cppContent: string, functionName: string): number {
         const lines = cppContent.split('\n');
         for (let i = 0; i < lines.length; i++) {
-            if (lines[i].includes(`JNIEXPORT`) && lines[i].includes(`JNICALL`) && lines[i].includes(functionName)) {
+            if (lines[i].includes(functionName)) {
                 return i + 1; // Convert to 1-based line number
             }
         }
@@ -561,46 +654,123 @@ export class LibraryHighlighter {
     }
 
     private getPossibleLibraryPaths(libraryName: string, expectedExtension: string): string[] {
-        const paths: string[] = [];
+        const candidates: string[] = [];
         const workspaceFolders = vscode.workspace.workspaceFolders;
+
+        // Helper: safe fs helpers
+        const safeReaddir = (dir: string): string[] => {
+            try { return fs.readdirSync(dir); } catch { return []; }
+        };
+        const safeStat = (p: string): fs.Stats | undefined => {
+            try { return fs.statSync(p); } catch { return undefined; }
+        };
+
+        // Helper: discover directories with likely names up to limited depth (to avoid blocking)
+        const discoverCandidateDirs = (root: string, names: string[], maxDepth: number = 3): string[] => {
+            const found: string[] = [];
+            const queue: Array<{ dir: string; depth: number }> = [{ dir: root, depth: 0 }];
+            while (queue.length) {
+                const { dir, depth } = queue.shift()!;
+                if (depth > maxDepth) continue;
+                const entries = safeReaddir(dir);
+                for (const entry of entries) {
+                    const full = path.join(dir, entry);
+                    const st = safeStat(full);
+                    if (!st) continue;
+                    if (st.isDirectory()) {
+                        if (names.includes(entry)) {
+                            found.push(full);
+                        }
+                        // Only traverse further if directory is not node_modules/.git to limit noise
+                        if (entry !== 'node_modules' && entry !== '.git' && entry !== '.gradle' && entry !== 'target' && entry !== 'build') {
+                            queue.push({ dir: full, depth: depth + 1 });
+                        }
+                    }
+                }
+            }
+            return found;
+        };
+
+        // Helper: generate file name variants for the library
+        const extensions = ['dll', 'so', 'dylib'];
+        const names: string[] = [libraryName];
+        if (this.currentPlatform === 'linux' || this.currentPlatform === 'darwin') {
+            // On Unix-like systems, libraries are commonly prefixed with 'lib'
+            names.push(`lib${libraryName}`);
+        }
+
+        // Prefer the directory of the active Java file first (common pattern: library placed next to the caller)
+        const activeEditor = vscode.window.activeTextEditor;
+        const activeJavaDir = (activeEditor && activeEditor.document.languageId === 'java')
+            ? path.dirname(activeEditor.document.uri.fsPath)
+            : undefined;
 
         if (workspaceFolders) {
             for (const folder of workspaceFolders) {
-                // Common library locations
-                const commonPaths = [
-                    path.join(folder.uri.fsPath, 'lib'),
-                    path.join(folder.uri.fsPath, 'libs'),
-                    path.join(folder.uri.fsPath, 'native'),
-                    path.join(folder.uri.fsPath, 'bin'),
-                    path.join(folder.uri.fsPath, 'target', 'lib'),
-                    path.join(folder.uri.fsPath, 'build', 'lib'),
-                ];
+                const root = folder.uri.fsPath;
+                // Seed directories: known common paths near the root
+                const seedDirs = [
+                    activeJavaDir, // include the directory of the Java file containing loadLibrary
+                    path.join(root, 'lib'),
+                    path.join(root, 'libs'),
+                    path.join(root, 'native'),
+                    path.join(root, 'bin'),
+                    path.join(root, 'target'),
+                    path.join(root, 'build'),
+                    path.join(root, 'demo'), // project-specific folder observed in this repo
+                ].filter((p): p is string => typeof p === 'string' && fs.existsSync(p));
 
-                for (const commonPath of commonPaths) {
-                    if (fs.existsSync(commonPath)) {
-                        // Check for files with different extensions
-                        const extensions = ['dll', 'so', 'dylib'];
+                // Add nested likely directories discovered within a bounded depth
+                const discovered = new Set<string>();
+                for (const seed of seedDirs) {
+                    discovered.add(seed);
+                    for (const dir of discoverCandidateDirs(seed, ['lib', 'libs', 'native', 'bin'], 2)) {
+                        discovered.add(dir);
+                    }
+                }
+
+                // Generate candidate files
+                for (const dir of discovered) {
+                    for (const base of names) {
                         for (const ext of extensions) {
-                            const libPath = path.join(commonPath, `${libraryName}.${ext}`);
-                            paths.push(libPath);
+                            candidates.push(path.join(dir, `${base}.${ext}`));
                         }
                     }
                 }
 
-                // Also check system library paths
+                // Also check directly under the workspace root (some projects drop binaries here)
+                for (const base of names) {
+                    for (const ext of extensions) {
+                        candidates.push(path.join(root, `${base}.${ext}`));
+                    }
+                }
+
+                // System library paths
                 if (this.currentPlatform === 'win32') {
-                    paths.push(path.join(process.env.SYSTEMROOT || 'C:\\Windows', 'System32', `${libraryName}.${expectedExtension}`));
-                } else if (this.currentPlatform === 'linux') {
-                    paths.push(`/usr/lib/lib${libraryName}.${expectedExtension}`);
-                    paths.push(`/usr/local/lib/lib${libraryName}.${expectedExtension}`);
-                } else if (this.currentPlatform === 'darwin') {
-                    paths.push(`/usr/lib/lib${libraryName}.${expectedExtension}`);
-                    paths.push(`/usr/local/lib/lib${libraryName}.${expectedExtension}`);
+                    const systemRoot = process.env.SYSTEMROOT || 'C:\\Windows';
+                    for (const base of names) {
+                        candidates.push(path.join(systemRoot, 'System32', `${base}.dll`));
+                    }
+                    // Also search PATH directories for dll
+                    const pathEnv = process.env.PATH || '';
+                    for (const pth of pathEnv.split(path.delimiter)) {
+                        if (!pth) continue;
+                        for (const base of names) {
+                            candidates.push(path.join(pth, `${base}.dll`));
+                        }
+                    }
+                } else if (this.currentPlatform === 'linux' || this.currentPlatform === 'darwin') {
+                    const sysDirs = ['/usr/lib', '/usr/local/lib'];
+                    for (const sys of sysDirs) {
+                        for (const base of names) {
+                            candidates.push(path.join(sys, `${base}.${expectedExtension}`));
+                        }
+                    }
                 }
             }
         }
 
-        return paths;
+        return Array.from(new Set(candidates));
     }
 
     private createHoverMessage(libraryName: string, status: LibraryInfo): vscode.MarkdownString {
