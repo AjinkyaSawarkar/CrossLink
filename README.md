@@ -96,11 +96,17 @@ This extension contributes the following settings:
 * `dependencyVisualizer.autoRefresh`: Automatically refresh dependencies when build files change (default: true)
 * `dependencyVisualizer.showPlatformWarnings`: Show platform compatibility warnings (default: true)
 
-## Known Issues
+# Running the Cross-Language Dependency Visualizer Extension
 
-- Library highlighting may not work correctly if library files are in non-standard locations
-- Some complex JNI method signatures might not be detected properly
-- Cross-platform library detection is limited to common library paths
+Launch Extension Host
+
+1. Open the project folder in VS Code
+2. Press **F5** (or go to **Run → Start Debugging**)
+3. A new VS Code window will open with the extension loaded
+4. Open any java file from a JNI project.
+
+
+
 
 ## Release Notes
 
