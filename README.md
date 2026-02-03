@@ -172,7 +172,13 @@ Launch Extension Host
 For testing you can use this JNI repo https://community.opengroup.org/osdu/platform/domain-data-mgmt-services/seismic/open-vds
 
 # Video Demonstration
-<iframe width="560" height="315" src="https://www.youtube.com/embed/ZB3VUi8-hW8?si=6oy7pkScG3siXi-n" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin" allowfullscreen></iframe>
+<p align="center">
+  <a href="https://youtu.be/ZB3VUi8-hW8">
+    <img src="https://img.youtube.com/vi/ZB3VUi8-hW8/maxresdefault.jpg" width="600" alt="CrossLink Demo Video">
+  </a>
+  <br>
+  <b>Video: CrossLink Tool Demonstration</b>
+</p>
 
 ## Release Notes
 
