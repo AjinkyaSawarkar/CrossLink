@@ -199,7 +199,7 @@ export class LibraryHighlighter {
         // Warm JNI index in background for fast lookups
         const analyzer = getAnalyzer();
         if (analyzer) {
-            analyzer.rebuildJniIndex?.().catch(() => {});
+            analyzer.rebuildJniIndex?.().catch(() => { });
         }
     }
 
@@ -231,8 +231,8 @@ export class LibraryHighlighter {
         // Add library call code lenses
         for (const call of libraryCalls) {
             const status = this.checkLibraryStatus(call.libraryName);
-            const statusText = status.status === 'missing' ? 'Missing' : 
-                              status.status === 'wrong_extension' ? 'Wrong Extension' : 'Ready';
+            const statusText = status.status === 'missing' ? 'Missing' :
+                status.status === 'wrong_extension' ? 'Wrong Extension' : 'Ready';
             const command: vscode.Command = {
                 title: `${this.getStatusIcon(status.status)} ${call.libraryName} • ${statusText}`,
                 command: 'dependencyVisualizer.showLibraryInfo',
@@ -246,10 +246,10 @@ export class LibraryHighlighter {
         for (const method of nativeMethods) {
             // Check implementation status for this method
             const updatedMethodInfo = await this.checkNativeMethodImplementation(method.methodInfo);
-            
+
             const statusText = updatedMethodInfo.status === 'implemented' ? 'Implemented' : 'Missing Implementation';
             const icon = updatedMethodInfo.status === 'implemented' ? '🔗' : '🔗❌';
-            
+
             // For implemented methods, add a "Go to Implementation" command
             if (updatedMethodInfo.status === 'implemented') {
                 const goToCommand: vscode.Command = {
@@ -272,7 +272,7 @@ export class LibraryHighlighter {
     }
 
     private async refreshHighlights(): Promise<void> {
-        const editors = vscode.window.visibleTextEditors.filter(editor => 
+        const editors = vscode.window.visibleTextEditors.filter(editor =>
             editor.document.languageId === 'java'
         );
 
@@ -433,12 +433,9 @@ export class LibraryHighlighter {
 
     private extractClassName(document: vscode.TextDocument): string {
         const content = document.getText();
-        // Prefer a public class if present
-        const publicMatch = content.match(/\bpublic\s+class\s+(\w+)/);
-        if (publicMatch) return publicMatch[1];
-        // Fallback to any class declaration (top-most occurrence)
-        const anyMatch = content.match(/\bclass\s+(\w+)/);
-        return anyMatch ? anyMatch[1] : 'UnknownClass';
+        // Match class declaration at start of line (prevents matching within comments)
+        const match = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
+        return match ? match[1] : 'UnknownClass';
     }
 
     private extractPackageName(document: vscode.TextDocument): string {
@@ -467,7 +464,7 @@ export class LibraryHighlighter {
 
         // Generate the expected JNI function name
         let expectedFunctionName = `Java_${methodInfo.className}_${methodInfo.methodName}`;
-        
+
         // If there's a package, include it in the function name
         if (methodInfo.packageName) {
             const packagePrefix = methodInfo.packageName.replace(/\./g, '_');
@@ -486,23 +483,23 @@ export class LibraryHighlighter {
                     const doc = await vscode.workspace.openTextDocument(found);
                     const content = doc.getText();
                     methodInfo.implementationLine = this.findImplementationLine(content, expectedFunctionName);
-                } catch {}
+                } catch { }
                 return methodInfo;
             }
-        } catch {}
+        } catch { }
 
         // First, look for implementation files (.cpp, .cc, .cxx, .c) - these contain the actual implementation
         const implementationFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c}');
-        
+
         // Slow path: Search for the JNI function in implementation files
         for (const implFile of implementationFiles) {
             try {
                 const implDocument = await vscode.workspace.openTextDocument(implFile);
                 const implContent = implDocument.getText();
-                
+
                 // Look for JNI function with the expected name (allow variants without JNIEXPORT/JNICALL and overload suffixes)
                 const jniFunctionRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
-                
+
                 if (jniFunctionRegex.test(implContent)) {
                     methodInfo.cppImplementationExists = true;
                     methodInfo.status = 'implemented';
@@ -518,15 +515,15 @@ export class LibraryHighlighter {
 
         // If not found in implementation files, check header files (.h, .hpp) for declarations
         const headerFiles = await vscode.workspace.findFiles('**/*.{h,hpp}');
-        
+
         for (const headerFile of headerFiles) {
             try {
                 const headerDocument = await vscode.workspace.openTextDocument(headerFile);
                 const headerContent = headerDocument.getText();
-                
+
                 // Look for JNI function declaration with the expected name (allow overload suffixes)
                 const jniDeclRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
-                
+
                 if (jniDeclRegex.test(headerContent)) {
                     methodInfo.cppImplementationExists = true;
                     methodInfo.status = 'implemented';
@@ -559,13 +556,13 @@ export class LibraryHighlighter {
             try {
                 const document = await vscode.workspace.openTextDocument(methodInfo.implementationFile);
                 const editor = await vscode.window.showTextDocument(document);
-                
+
                 // Go to the specific line where the implementation is
                 const line = methodInfo.implementationLine || 1;
                 const position = new vscode.Position(line - 1, 0);
                 editor.selection = new vscode.Selection(position, position);
                 editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
-                
+
                 // Show a notification if we're in a header file
                 if (methodInfo.isHeaderFile) {
                     vscode.window.showInformationMessage(
@@ -582,7 +579,7 @@ export class LibraryHighlighter {
 
     private getLibraryAtPosition(document: vscode.TextDocument, position: vscode.Position): { libraryName: string; range: vscode.Range } | undefined {
         const libraryCalls = this.findLibraryCalls(document);
-        
+
         for (const call of libraryCalls) {
             if (call.range.contains(position)) {
                 return call;
@@ -594,7 +591,7 @@ export class LibraryHighlighter {
 
     private getNativeMethodAtPosition(document: vscode.TextDocument, position: vscode.Position): { methodInfo: NativeMethodInfo; range: vscode.Range } | undefined {
         const nativeMethods = this.findNativeMethods(document);
-        
+
         for (const method of nativeMethods) {
             if (method.range.contains(position)) {
                 return method;
@@ -606,15 +603,17 @@ export class LibraryHighlighter {
 
     private checkLibraryStatus(libraryName: string): LibraryInfo {
         const expectedExtension = this.getExpectedExtension();
+        const validExtensions = this.getValidExtensions();
         const possiblePaths = this.getPossibleLibraryPaths(libraryName, expectedExtension);
-        
+
         let fileExists = false;
         let extensionMatches = false;
 
-        for (const path of possiblePaths) {
-            if (fs.existsSync(path)) {
+        for (const libPath of possiblePaths) {
+            if (fs.existsSync(libPath)) {
                 fileExists = true;
-                if (path.endsWith(`.${expectedExtension}`)) {
+                // Check if the file matches any of the valid extensions for this platform
+                if (validExtensions.some(ext => libPath.endsWith(`.${ext}`))) {
                     extensionMatches = true;
                     break;
                 }
@@ -647,9 +646,22 @@ export class LibraryHighlighter {
             case 'linux':
                 return 'so';
             case 'darwin':
-                return 'dylib';
+                return 'jnilib'; // macOS JNI libraries can use .jnilib or .dylib
             default:
                 return 'so';
+        }
+    }
+
+    private getValidExtensions(): string[] {
+        switch (this.currentPlatform) {
+            case 'win32':
+                return ['dll'];
+            case 'linux':
+                return ['so'];
+            case 'darwin':
+                return ['jnilib', 'dylib']; // macOS supports both .jnilib and .dylib
+            default:
+                return ['so'];
         }
     }
 
@@ -776,17 +788,17 @@ export class LibraryHighlighter {
     private createHoverMessage(libraryName: string, status: LibraryInfo): vscode.MarkdownString {
         const markdown = new vscode.MarkdownString();
         markdown.isTrusted = true;
-        
+
         // Header with library name and status
         const statusIcon = this.getStatusIcon(status.status);
         const statusText = status.status.toUpperCase().replace('_', ' ');
         markdown.appendMarkdown(`## ${statusIcon} Library: \`${libraryName}\`\n\n`);
-        
+
         // Status badge
-        const statusColor = status.status === 'missing' ? '#f44336' : 
-                           status.status === 'wrong_extension' ? '#2196f3' : '#4caf50';
+        const statusColor = status.status === 'missing' ? '#f44336' :
+            status.status === 'wrong_extension' ? '#2196f3' : '#4caf50';
         markdown.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
-        
+
         // Platform information
         markdown.appendMarkdown(`**🖥️ Platform:** ${this.getPlatformName(status.currentPlatform)}\n`);
         markdown.appendMarkdown(`**📁 Expected Extension:** \`.${status.expectedExtension}\`\n\n`);
@@ -826,16 +838,16 @@ export class LibraryHighlighter {
     private createNativeMethodHoverMessage(methodInfo: NativeMethodInfo): vscode.MarkdownString {
         const markdown = new vscode.MarkdownString();
         markdown.isTrusted = true;
-        
+
         // Header with method name and status
         const statusIcon = methodInfo.status === 'implemented' ? '🔗' : '🔗❌';
         const statusText = methodInfo.status === 'implemented' ? 'IMPLEMENTED' : 'MISSING IMPLEMENTATION';
         markdown.appendMarkdown(`## ${statusIcon} Native Method: \`${methodInfo.methodName}\`\n\n`);
-        
+
         // Status badge
         const statusColor = methodInfo.status === 'implemented' ? '#4caf50' : '#f44336';
         markdown.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
-        
+
         // Method information
         markdown.appendMarkdown(`**🏗️ Class:** \`${methodInfo.className}\`\n`);
         if (methodInfo.packageName) {
@@ -910,7 +922,7 @@ export class LibraryHighlighter {
     private async showLibraryInfo(libraryName: string): Promise<void> {
         const status = this.checkLibraryStatus(libraryName);
         const message = this.createInfoMessage(libraryName, status);
-        
+
         vscode.window.showInformationMessage(message, 'Refresh', 'Show Details').then(selection => {
             if (selection === 'Refresh') {
                 this.refreshHighlights();
@@ -923,7 +935,7 @@ export class LibraryHighlighter {
     private createInfoMessage(libraryName: string, status: LibraryInfo): string {
         const icon = this.getStatusIcon(status.status);
         const platform = this.getPlatformName(status.currentPlatform);
-        
+
         switch (status.status) {
             case 'missing':
                 return `${icon} Library '${libraryName}' not found for ${platform} (expected .${status.expectedExtension})`;

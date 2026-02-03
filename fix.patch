@@ -1,0 +1,3362 @@
+commit 7e5f24c64a227b849b7fd162adfeac6cb95b4c90
+Author: Ajinkya Sawarkar <cs23s501@iittp.ac.in>
+Date:   Tue Feb 3 12:11:39 2026 +0530
+
+    Updated constant naming assistance
+
+diff --git a/demo/constants-naming-demo.md b/demo/constants-naming-demo.md
+index 8dda558..62983e3 100644
+--- a/demo/constants-naming-demo.md
++++ b/demo/constants-naming-demo.md
+@@ -4,10 +4,11 @@ This demo showcases the enhanced constant naming suggestions feature in the Cros
+ 
+ ## 🚀 **Key Improvements**
+ 
+-### **1. Enhanced Naming Rules**
+-- **Magic Number Detection**: Automatically identifies magic numbers with 95% confidence
+-- **Context-Aware Suggestions**: Provides suggestions based on surrounding code context
+-- **Domain-Specific Rules**: Specialized rules for time, network, UI, error codes, and mathematical constants
++### **1. Focused Magic Number Detection** ✨ UPDATED
++- **Only detects numbers in comparisons**: `if (count < 5)` → suggests `MAX_COUNT`
++- **Only detects numbers in loops**: `for (i = 0; i < 10; i++)` → suggests `MAX_ITERATIONS`
++- **Context-aware suggestions**: Uses variable names to generate meaningful suggestions
++- **Examples**: `if (retries < 3)` → `MAX_RETRIES`, `while (age < 18)` → `MAX_AGE`
+ 
+ ### **2. Direct Apply Buttons**
+ - **🔥 One-Click Application**: Click on any constant with suggestions to apply the best one
+@@ -70,10 +71,10 @@ double e = 2.718;          // → EULER_NUMBER, MATH_E
+ 2. Navigate to the "Constants" section
+ 3. View all constants with their suggestions
+ 
+-### **2. Apply Suggestions**
+-- **🔥 Click on any constant** with suggestions to apply the best one
++### **2. Copy Suggestions** 📋 UPDATED
++- **📋 Click on any constant** with suggestions to copy the best one to clipboard
+ - **💡 Expand suggestions** to see all alternatives
+-- **📋 Click individual suggestions** to apply specific ones
++- **📋 Click individual suggestions** to copy specific ones to clipboard
+ 
+ ### **3. Confidence Levels**
+ - **🔥 High Confidence (80%+)**: Strong suggestions based on clear patterns
+@@ -91,13 +92,20 @@ double e = 2.718;          // → EULER_NUMBER, MATH_E
+ ### **Suggestion Items**
+ - **⭐ Primary suggestions**: Best recommendations
+ - **💡 Alternative suggestions**: Other good options
+-- **🔄 Apply buttons**: Direct application links
++- **📋 Copy buttons**: Click to copy name to clipboard
+ 
+ ### **Hover Information**
+ - **Rich tooltips** with detailed information
+-- **Apply buttons** for each suggestion
++- **Copy buttons** for each suggestion
+ - **Context information** about the constant
+ 
++## 📊 **Logging** ✨ NEW
++
++The extension logs all constant naming actions to the "Constants Naming Log" output channel:
++- **View logs**: Open Output panel (Ctrl+Shift+U) → Select "Constants Naming Log"
++- **Logged actions**: Copy to clipboard, Apply suggestion
++- **Format**: `[timestamp] ACTION: "value" → "suggestion" at file:line`
++
+ ## 🔧 **Naming Rule Categories**
+ 
+ ### **1. Magic Number Detection (95% confidence)**
+@@ -140,6 +148,42 @@ double e = 2.718;          // → EULER_NUMBER, MATH_E
+ - **3.14159**: `PI_VALUE`, `MATH_PI`
+ - **2.718**: `EULER_NUMBER`, `MATH_E`
+ 
++### **8. Cryptography Constants (88% confidence)** ✨ NEW
++- **128**: `AES_KEY_SIZE_128`, `KEY_LENGTH_128`
++- **256**: `AES_KEY_SIZE_256`, `SHA256_BITS`
++- **2048**: `RSA_KEY_SIZE_2048`, `RECOMMENDED_KEY_SIZE`
++- **4096**: `RSA_KEY_SIZE_4096`, `HIGH_SECURITY_KEY_SIZE`
++
++### **9. Unix Permission Constants (92% confidence)** ✨ NEW
++- **755**: `DIR_PERMISSION_755`, `EXECUTABLE_PERMISSION`
++- **644**: `FILE_PERMISSION_644`, `READ_WRITE_PERMISSION`
++- **700**: `OWNER_ONLY_PERMISSION`, `PRIVATE_DIR_MODE`
++- **777**: `FULL_PERMISSION_777`, `ALL_ACCESS_PERMISSION`
++
++### **10. Retry Limits (85% confidence)** ✨ NEW
++- Detects small integers (1-20) near retry/poll/attempt keywords
++- Suggestions: `MAX_RETRIES`, `RETRY_LIMIT`, `MAX_POLL_ATTEMPTS`
++
++### **11. Character Codes (80% confidence)** ✨ NEW
++- **32**: `SPACE_CHAR`, `SPACE_ASCII`
++- **10**: `NEWLINE_CHAR`, `LINE_FEED`
++- **13**: `CARRIAGE_RETURN`, `CR_CHAR`
++- **9**: `TAB_CHAR`, `HORIZONTAL_TAB`
++
++### **12. Bit Flag Constants (90% confidence)** ✨ NEW
++- Power-of-2 values near bitwise operations (&, |, ^, <<, >>)
++- Suggestions: `FLAG_BIT_N`, `MASK_N`, `BIT_FLAG_N`
++
++### **13. Memory/Alignment Constants (82% confidence)** ✨ NEW
++- **64**: `CACHE_LINE_SIZE_64`, `BLOCK_SIZE_64`
++- **128**: `BLOCK_SIZE_128`, `CACHE_BLOCK_SIZE`
++- **256**: `PAGE_SIZE_256`, `ALLOCATION_BLOCK`
++
++### **14. Configuration Thresholds (75% confidence)** ✨ NEW
++- **50**: `HALF_PERCENT`, `MID_THRESHOLD`
++- **100**: `FULL_PERCENT`, `MAX_PERCENTAGE`
++- **1000**: `THOUSAND_VALUE`, `KILO_MULTIPLIER`
++
+ ## 🚀 **Benefits**
+ 
+ ### **For Developers**
+diff --git a/src/constants/constantsAnalyzer.ts b/src/constants/constantsAnalyzer.ts
+index 8762144..e007355 100644
+--- a/src/constants/constantsAnalyzer.ts
++++ b/src/constants/constantsAnalyzer.ts
+@@ -20,9 +20,9 @@ export interface ConstantInfo {
+ }
+ 
+ export interface ConstantContext {
+-    type: 'variable_assignment' | 'function_argument' | 'calculation' | 'comparison' | 
+-          'loop_condition' | 'array_index' | 'bitwise' | 'return_code' | 'time_calc' | 
+-          'ui_dimension' | 'buffer_size' | 'unknown';
++    type: 'variable_assignment' | 'function_argument' | 'calculation' | 'comparison' |
++    'loop_condition' | 'array_index' | 'bitwise' | 'return_code' | 'time_calc' |
++    'ui_dimension' | 'buffer_size' | 'unknown';
+     surroundingCode: string;
+     variableName?: string;
+     functionName?: string;
+@@ -39,7 +39,7 @@ export class ConstantsAnalyzer {
+ 
+     async analyzeWorkspace(workspaceFolder: vscode.WorkspaceFolder): Promise<ConstantInfo[]> {
+         console.log('🔍 Analyzing constants in workspace...');
+-        
++
+         this.constants.clear();
+ 
+         // Find Java files
+@@ -68,17 +68,17 @@ export class ConstantsAnalyzer {
+ 
+         // Regex for Java constants (static final)
+         const constantRegex = /(?:public|private|protected)?\s*static\s+final\s+(\w+)\s+([A-Z_][A-Z0-9_]*)\s*=\s*([^;]+);/g;
+-        
++
+         let match;
+         while ((match = constantRegex.exec(content)) !== null) {
+             const type = match[1];
+             const name = match[2];
+             const value = match[3].trim();
+-            
++
+             const position = document.positionAt(match.index);
+             const context = this.analyzeContext(content, match.index, lines, position.line);
+             const suggestedNames = this.generateNameSuggestions(value, context);
+-            
++
+             const constantInfo: ConstantInfo = {
+                 name,
+                 value,
+@@ -110,15 +110,15 @@ export class ConstantsAnalyzer {
+         // Regex for #define macros
+         const defineRegex = /#define\s+([A-Z_][A-Z0-9_]*)\s+(.+)/g;
+         let match;
+-        
++
+         while ((match = defineRegex.exec(content)) !== null) {
+             const name = match[1];
+             const value = match[2].trim();
+-            
++
+             const position = document.positionAt(match.index);
+             const context = this.analyzeContext(content, match.index, lines, position.line);
+             const suggestedNames = this.generateNameSuggestions(value, context);
+-            
++
+             const constantInfo: ConstantInfo = {
+                 name,
+                 value,
+@@ -143,11 +143,11 @@ export class ConstantsAnalyzer {
+             const type = match[1];
+             const name = match[2];
+             const value = match[3].trim();
+-            
++
+             const position = document.positionAt(match.index);
+             const context = this.analyzeContext(content, match.index, lines, position.line);
+             const suggestedNames = this.generateNameSuggestions(value, context);
+-            
++
+             const constantInfo: ConstantInfo = {
+                 name,
+                 value,
+@@ -171,11 +171,11 @@ export class ConstantsAnalyzer {
+         const surroundingStart = Math.max(0, lineNumber - 2);
+         const surroundingEnd = Math.min(lines.length - 1, lineNumber + 2);
+         const surroundingCode = lines.slice(surroundingStart, surroundingEnd + 1).join('\n');
+-        
++
+         const currentLine = lines[lineNumber];
+         const prevLine = lineNumber > 0 ? lines[lineNumber - 1] : '';
+         const nextLine = lineNumber < lines.length - 1 ? lines[lineNumber + 1] : '';
+-        
++
+         // Analyze context type based on surrounding code
+         let contextType: ConstantContext['type'] = 'unknown';
+         let variableName: string | undefined;
+@@ -239,7 +239,7 @@ export class ConstantsAnalyzer {
+     }
+ 
+ 
+-    
++
+     private generateNameSuggestions(value: string, context: ConstantContext): { suggestions: string[]; confidence: number } {
+         const suggestions: string[] = [];
+         let confidence = 50; // Base confidence
+@@ -299,14 +299,14 @@ export class ConstantsAnalyzer {
+                 'magic_number',
+                 (value, context) => {
+                     const numValue = parseInt(value);
+-                    return /^\d{2,}$/.test(value) && 
+-                           !['10', '100', '1000', '3600', '365', '24', '60', '99', '50', '256', '512'].includes(value) &&
+-                           !/^0+$/.test(value);
++                    return /^\d{2,}$/.test(value) &&
++                        !['10', '100', '1000', '3600', '365', '24', '60', '99', '50', '256', '512'].includes(value) &&
++                        !/^0+$/.test(value);
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common patterns for magic numbers
+                     if (numValue >= 1000 && numValue <= 9999) {
+                         suggestions.push('DEFAULT_TIMEOUT_MS', 'MAX_BUFFER_SIZE', 'DEFAULT_PORT');
+@@ -315,7 +315,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue >= 10 && numValue <= 99) {
+                         suggestions.push('MAX_ATTEMPTS', 'RETRY_COUNT', 'DEFAULT_COUNT');
+                     }
+-                    
++
+                     // Context-specific suggestions
+                     if (context.type === 'comparison') {
+                         suggestions.push('THRESHOLD_VALUE', 'LIMIT_VALUE', 'MAX_VALUE');
+@@ -324,7 +324,7 @@ export class ConstantsAnalyzer {
+                     } else if (context.type === 'array_index') {
+                         suggestions.push('ARRAY_SIZE', 'INDEX_LIMIT', 'MAX_INDEX');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 95
+@@ -335,14 +335,14 @@ export class ConstantsAnalyzer {
+                 'time_constants',
+                 (value, context) => {
+                     const timeKeywords = ['second', 'minute', 'hour', 'day', 'ms', 'time', 'delay', 'sleep', 'wait'];
+-                    return timeKeywords.some(keyword => 
++                    return timeKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common time values
+                     if (numValue === 1000) {
+                         suggestions.push('MILLISECONDS_PER_SECOND', 'MS_PER_SECOND', 'DEFAULT_TIMEOUT_MS');
+@@ -357,7 +357,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 30000) {
+                         suggestions.push('LONG_TIMEOUT_MS', 'SESSION_TIMEOUT_MS', 'IDLE_TIMEOUT_MS');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 90
+@@ -368,14 +368,14 @@ export class ConstantsAnalyzer {
+                 'buffer_size',
+                 (value, context) => {
+                     const bufferKeywords = ['buffer', 'size', 'length', 'capacity', 'bytes', 'kb', 'mb'];
+-                    return bufferKeywords.some(keyword => 
++                    return bufferKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common buffer sizes
+                     if (numValue === 1024) {
+                         suggestions.push('DEFAULT_BUFFER_SIZE', 'BUFFER_CAPACITY', 'READ_BUFFER_SIZE', 'KILOBYTE_SIZE');
+@@ -388,7 +388,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 65536) {
+                         suggestions.push('MAX_BUFFER_SIZE', 'LARGE_CHUNK_SIZE', 'SIXTY_FOUR_KILOBYTE_SIZE');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 85
+@@ -399,14 +399,14 @@ export class ConstantsAnalyzer {
+                 'network_constants',
+                 (value, context) => {
+                     const networkKeywords = ['port', 'connection', 'socket', 'http', 'tcp', 'udp', 'server', 'client'];
+-                    return networkKeywords.some(keyword => 
++                    return networkKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common port numbers
+                     if (numValue === 80) {
+                         suggestions.push('HTTP_PORT', 'DEFAULT_HTTP_PORT', 'WEB_PORT');
+@@ -423,12 +423,12 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 27017) {
+                         suggestions.push('MONGO_PORT', 'MONGODB_PORT', 'NOSQL_PORT');
+                     }
+-                    
++
+                     // Connection limits
+                     if (numValue >= 100 && numValue <= 1000) {
+                         suggestions.push('MAX_CONNECTIONS', 'CONNECTION_POOL_SIZE', 'DEFAULT_CONNECTION_LIMIT');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 88
+@@ -439,14 +439,14 @@ export class ConstantsAnalyzer {
+                 'ui_constants',
+                 (value, context) => {
+                     const uiKeywords = ['width', 'height', 'size', 'pixel', 'px', 'margin', 'padding', 'border', 'font'];
+-                    return uiKeywords.some(keyword => 
++                    return uiKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common UI dimensions
+                     if (numValue === 800) {
+                         suggestions.push('DEFAULT_WINDOW_WIDTH', 'MIN_WINDOW_WIDTH', 'STANDARD_WIDTH');
+@@ -461,7 +461,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 12) {
+                         suggestions.push('SMALL_MARGIN', 'COMPACT_PADDING', 'MIN_BORDER_WIDTH');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 82
+@@ -472,14 +472,14 @@ export class ConstantsAnalyzer {
+                 'error_constants',
+                 (value, context) => {
+                     const errorKeywords = ['error', 'status', 'code', 'exception', 'fail', 'success', 'ok'];
+-                    return errorKeywords.some(keyword => 
++                    return errorKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     // Common status codes
+                     if (numValue === 0) {
+                         suggestions.push('SUCCESS_CODE', 'OK_STATUS', 'NO_ERROR');
+@@ -492,7 +492,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 500) {
+                         suggestions.push('INTERNAL_ERROR', 'SERVER_ERROR', 'HTTP_500');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 85
+@@ -503,14 +503,14 @@ export class ConstantsAnalyzer {
+                 'math_constants',
+                 (value, context) => {
+                     const mathKeywords = ['pi', 'euler', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan'];
+-                    return mathKeywords.some(keyword => 
++                    return mathKeywords.some(keyword =>
+                         context.surroundingCode.toLowerCase().includes(keyword)
+                     );
+                 },
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseFloat(value);
+-                    
++
+                     if (Math.abs(numValue - Math.PI) < 0.01) {
+                         suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
+                     } else if (Math.abs(numValue - Math.E) < 0.01) {
+@@ -520,12 +520,199 @@ export class ConstantsAnalyzer {
+                     } else if (numValue === 3.14159) {
+                         suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
+                     }
+-                    
++
++                    return suggestions;
++                },
++                90
++            ),
++
++            // Cryptography and Security Constants - NEW
++            new NamingRule(
++                'crypto_constants',
++                (value, context) => {
++                    const cryptoKeywords = ['key', 'encrypt', 'decrypt', 'rsa', 'aes', 'ssl', 'tls', 'hash', 'cipher', 'crypto', 'secret', 'token'];
++                    const cryptoValues = [128, 192, 256, 512, 1024, 2048, 4096, 8192];
++                    const numValue = parseInt(value);
++                    return cryptoKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
++                        cryptoValues.includes(numValue);
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++
++                    if (numValue === 128) suggestions.push('AES_KEY_SIZE_128', 'KEY_LENGTH_128', 'HASH_SIZE_BITS');
++                    else if (numValue === 256) suggestions.push('AES_KEY_SIZE_256', 'SHA256_BITS', 'ENCRYPTION_KEY_SIZE');
++                    else if (numValue === 512) suggestions.push('SHA512_BITS', 'RSA_KEY_SIZE_512', 'HASH_LENGTH_BITS');
++                    else if (numValue === 1024) suggestions.push('RSA_KEY_SIZE_1024', 'KEY_SIZE_BITS', 'CRYPTO_BLOCK_SIZE');
++                    else if (numValue === 2048) suggestions.push('RSA_KEY_SIZE_2048', 'RECOMMENDED_KEY_SIZE', 'SECURE_KEY_BITS');
++                    else if (numValue === 4096) suggestions.push('RSA_KEY_SIZE_4096', 'HIGH_SECURITY_KEY_SIZE', 'MAX_KEY_SIZE');
++
++                    return suggestions;
++                },
++                88
++            ),
++
++            // Unix Permission Constants - NEW
++            new NamingRule(
++                'permission_constants',
++                (value, context) => {
++                    const permKeywords = ['chmod', 'permission', 'mode', 'access', 'umask', 'file', 'dir', 'folder'];
++                    const permValues = [400, 444, 600, 644, 700, 755, 777, 775, 664];
++                    const numValue = parseInt(value);
++                    return permKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
++                        permValues.includes(numValue);
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++
++                    if (numValue === 755) suggestions.push('DIR_PERMISSION_755', 'EXECUTABLE_PERMISSION', 'DEFAULT_DIR_MODE');
++                    else if (numValue === 644) suggestions.push('FILE_PERMISSION_644', 'READ_WRITE_PERMISSION', 'DEFAULT_FILE_MODE');
++                    else if (numValue === 777) suggestions.push('FULL_PERMISSION_777', 'ALL_ACCESS_PERMISSION', 'MAX_PERMISSION');
++                    else if (numValue === 700) suggestions.push('OWNER_ONLY_PERMISSION', 'PRIVATE_DIR_MODE', 'SECURE_PERMISSION');
++                    else if (numValue === 600) suggestions.push('PRIVATE_FILE_PERMISSION', 'OWNER_RW_ONLY', 'SECURE_FILE_MODE');
++                    else if (numValue === 444) suggestions.push('READ_ONLY_PERMISSION', 'READONLY_FILE_MODE', 'NO_WRITE_PERMISSION');
++
++                    return suggestions;
++                },
++                92
++            ),
++
++            // Retry and Polling Limits - NEW
++            new NamingRule(
++                'retry_constants',
++                (value, context) => {
++                    const retryKeywords = ['retry', 'retries', 'attempt', 'poll', 'max', 'limit', 'count', 'tries', 'repeat'];
++                    const numValue = parseInt(value);
++                    return retryKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) &&
++                        numValue >= 1 && numValue <= 20;
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++                    const lowerCode = context.surroundingCode.toLowerCase();
++
++                    if (lowerCode.includes('retry') || lowerCode.includes('retries')) {
++                        suggestions.push('MAX_RETRIES', 'RETRY_LIMIT', 'MAX_RETRY_COUNT');
++                    } else if (lowerCode.includes('poll')) {
++                        suggestions.push('MAX_POLL_ATTEMPTS', 'POLL_RETRY_LIMIT', 'POLLING_MAX_TRIES');
++                    } else if (lowerCode.includes('attempt')) {
++                        suggestions.push('MAX_ATTEMPTS', 'ATTEMPT_LIMIT', 'TRY_COUNT_MAX');
++                    } else {
++                        suggestions.push('MAX_ITERATIONS', 'LOOP_LIMIT', 'REPEAT_COUNT');
++                    }
++
++                    return suggestions;
++                },
++                85
++            ),
++
++            // Character and ASCII Constants - NEW
++            new NamingRule(
++                'character_constants',
++                (value, context) => {
++                    const charKeywords = ['char', 'ascii', 'character', 'byte', 'code', 'unicode'];
++                    const numValue = parseInt(value);
++                    const commonChars = [0, 9, 10, 13, 32, 48, 65, 97, 127, 255];
++                    return charKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
++                        (commonChars.includes(numValue) && context.type === 'comparison');
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++
++                    if (numValue === 0) suggestions.push('NULL_CHAR', 'NUL_BYTE', 'STRING_TERMINATOR');
++                    else if (numValue === 9) suggestions.push('TAB_CHAR', 'HORIZONTAL_TAB', 'TAB_ASCII');
++                    else if (numValue === 10) suggestions.push('NEWLINE_CHAR', 'LINE_FEED', 'LF_CHAR');
++                    else if (numValue === 13) suggestions.push('CARRIAGE_RETURN', 'CR_CHAR', 'RETURN_CHAR');
++                    else if (numValue === 32) suggestions.push('SPACE_CHAR', 'SPACE_ASCII', 'WHITESPACE_CHAR');
++                    else if (numValue === 48) suggestions.push('ZERO_CHAR', 'DIGIT_ZERO_ASCII', 'CHAR_0');
++                    else if (numValue === 65) suggestions.push('UPPERCASE_A', 'CHAR_A_ASCII', 'ALPHA_START');
++                    else if (numValue === 97) suggestions.push('LOWERCASE_A', 'CHAR_a_ASCII', 'LOWER_ALPHA_START');
++                    else if (numValue === 127) suggestions.push('DELETE_CHAR', 'DEL_ASCII', 'MAX_ASCII_CONTROL');
++                    else if (numValue === 255) suggestions.push('MAX_BYTE_VALUE', 'UCHAR_MAX', 'BYTE_MAX');
++
++                    return suggestions;
++                },
++                80
++            ),
++
++            // Memory and Data Structure Sizes - NEW
++            new NamingRule(
++                'memory_constants',
++                (value, context) => {
++                    const memKeywords = ['alloc', 'memory', 'heap', 'stack', 'cache', 'block', 'chunk', 'segment'];
++                    const numValue = parseInt(value);
++                    const powerOfTwo = numValue > 0 && (numValue & (numValue - 1)) === 0 && numValue >= 16;
++                    return memKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) || powerOfTwo;
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++
++                    if (numValue === 16) suggestions.push('ALIGNMENT_SIZE', 'CACHE_LINE_MIN', 'WORD_SIZE');
++                    else if (numValue === 32) suggestions.push('CACHE_LINE_SIZE', 'ALIGNMENT_32', 'STRUCT_PADDING');
++                    else if (numValue === 64) suggestions.push('CACHE_LINE_SIZE_64', 'BLOCK_SIZE_64', 'ALIGNMENT_64');
++                    else if (numValue === 128) suggestions.push('BLOCK_SIZE_128', 'CACHE_BLOCK_SIZE', 'MEMORY_ALIGNMENT');
++                    else if (numValue === 256) suggestions.push('PAGE_SIZE_256', 'ALLOCATION_BLOCK', 'CHUNK_SIZE_256');
++
++                    return suggestions;
++                },
++                82
++            ),
++
++            // Bit Flag Constants - NEW
++            new NamingRule(
++                'bitflag_constants',
++                (value, context) => {
++                    const bitwiseOps = ['&', '|', '^', '<<', '>>', '~'];
++                    const numValue = parseInt(value);
++                    const isPowerOfTwo = numValue > 0 && (numValue & (numValue - 1)) === 0;
++                    return bitwiseOps.some(op => context.surroundingCode.includes(op)) && isPowerOfTwo;
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++                    const bitPosition = Math.log2(numValue);
++
++                    suggestions.push(`FLAG_BIT_${bitPosition}`, `MASK_${numValue}`, `BIT_FLAG_${numValue}`);
++                    if (numValue === 1) suggestions.push('FLAG_ENABLED', 'FIRST_BIT', 'LSB_MASK');
++                    else if (numValue === 2) suggestions.push('FLAG_SECOND', 'SECOND_BIT', 'FLAG_ACTIVE');
++                    else if (numValue === 4) suggestions.push('FLAG_THIRD', 'THIRD_BIT', 'FLAG_VISIBLE');
++                    else if (numValue === 8) suggestions.push('FLAG_FOURTH', 'FOURTH_BIT', 'FLAG_SELECTED');
++
+                     return suggestions;
+                 },
+                 90
+             ),
+ 
++            // Configuration and Threshold Constants - NEW
++            new NamingRule(
++                'config_constants',
++                (value, context) => {
++                    const configKeywords = ['config', 'setting', 'threshold', 'limit', 'max', 'min', 'default', 'initial'];
++                    const numValue = parseInt(value);
++                    const roundNumbers = [10, 25, 50, 75, 100, 150, 200, 250, 500, 750, 1000];
++                    return configKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
++                        roundNumbers.includes(numValue);
++                },
++                (value, context) => {
++                    const suggestions = [];
++                    const numValue = parseInt(value);
++                    const varHint = (context.variableName || '').toUpperCase();
++
++                    if (varHint) {
++                        suggestions.push(`${varHint}_THRESHOLD`, `DEFAULT_${varHint}`, `${varHint}_LIMIT`);
++                    }
++                    if (numValue === 50) suggestions.push('HALF_PERCENT', 'MID_THRESHOLD', 'DEFAULT_PERCENTAGE');
++                    else if (numValue === 100) suggestions.push('FULL_PERCENT', 'MAX_PERCENTAGE', 'HUNDRED_PERCENT');
++                    else if (numValue === 1000) suggestions.push('THOUSAND_VALUE', 'KILO_MULTIPLIER', 'DEFAULT_LARGE_LIMIT');
++
++                    return suggestions;
++                },
++                75
++            ),
++
+             // Default rule for numeric values
+             new NamingRule(
+                 'default_numeric',
+@@ -533,7 +720,7 @@ export class ConstantsAnalyzer {
+                 (value, context) => {
+                     const suggestions = [];
+                     const numValue = parseInt(value);
+-                    
++
+                     if (numValue > 0 && numValue < 10) {
+                         suggestions.push('MAX_RETRIES', 'RETRY_COUNT', 'MAX_ATTEMPTS', 'DEFAULT_COUNT');
+                     } else if (numValue >= 10 && numValue < 100) {
+@@ -543,7 +730,7 @@ export class ConstantsAnalyzer {
+                     } else if (numValue >= 1000) {
+                         suggestions.push('LARGE_SIZE', 'MAX_CAPACITY', 'UPPER_LIMIT', 'MAX_VALUE');
+                     }
+-                    
++
+                     return suggestions;
+                 },
+                 40
+@@ -570,13 +757,13 @@ export class ConstantsAnalyzer {
+     private extractCppScope(content: string, index: number): 'public' | 'private' | 'global' {
+         const beforeDeclaration = content.substring(0, index);
+         const lines = beforeDeclaration.split('\n').reverse();
+-        
++
+         for (const line of lines) {
+             if (line.includes('public:')) return 'public';
+             if (line.includes('private:')) return 'private';
+             if (line.includes('class ') || line.includes('struct ')) break;
+         }
+-        
++
+         return 'global';
+     }
+ 
+@@ -600,9 +787,9 @@ export class ConstantsAnalyzer {
+     }
+ 
+ 
+-    
+ 
+-    
++
++
+ }
+ 
+ class NamingRule {
+@@ -611,7 +798,7 @@ class NamingRule {
+         public matches: (value: string, context: ConstantContext) => boolean,
+         public generateNames: (value: string, context: ConstantContext) => string[],
+         public confidence: number
+-    ) {}
++    ) { }
+ }
+ 
+ // Convert free-form text to SCREAMING_SNAKE_CASE constant style
+@@ -625,63 +812,315 @@ function toConstCase(text: string): string {
+ }
+ 
+ /**
+- * Scan a workspace for magic numbers.
+- * A magic number is any integer or float literal (not 0/1/2/10/100/1000 etc) outside of obvious constant/define lines.
+- * It populates the returned array with objects that follow the same shape as your normal constants, but with category: 'magic_number'.
++ * Scan workspace for magic numbers in:
++ * 1. Variable assignments: int ajinkya = 8080 → suggests AJINKYA_PORT, SERVER_PORT
++ * 2. Comparisons: if(a < 8080) → suggests SERVER_PORT for 8080
+  */
+ async function findMagicNumbersInWorkspace(): Promise<any[]> {
+     const allMagicNumbers: any[] = [];
+-    // Adjust the glob for your languages
+-    const files = await vscode.workspace.findFiles('**/*.{cpp,c,h,hpp,java,cs,js,ts}');
++    const files = await vscode.workspace.findFiles('**/*.{cpp,c,h,hpp,java}');
++
+     for (const file of files) {
+         const doc = await vscode.workspace.openTextDocument(file);
+         const lines = doc.getText().split('\n');
++
+         for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
+             const line = lines[lineNumber];
+-            // Skip comments and declarations
+-            if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
+-            if (/(const|#define|final|constexpr|static const)\b/i.test(line)) continue;
+-
+-            // Ignore numbers inside strings (basic version)
+-            let cleaned = line.replace(/(["'`]).*?\1/g, '');
+-
+-            // INT magic numbers >= 2 digits, not obvious enums, not array init's like int arr[10]
+-            for (const m of cleaned.matchAll(/\b-?\d{2,}\b/g)) {
+-                const value = m[0];
+-                if (/^0+$/.test(value)) continue; // all zeros
+-                if (["10","100","1000","3600","365","24","60","99","50","256","512"].includes(value)) continue; // common
+-                allMagicNumbers.push({
+-                    name: `MAGIC_${value}`,
+-                    value,
+-                    type: /^\d+$/.test(value) ? 'int' : 'unknown',
+-                    file: file.fsPath,
+-                    line: lineNumber,
+-                    column: m.index,
+-                    language: guessLangFromExt(file.fsPath),
+-                    category: 'magic_number',
+-                    suggestedNames: [], // (optional: run suggestions here if you have it)
+-                });
++            const trimmedLine = line.trim();
++
++            // Skip comments
++            if (trimmedLine.startsWith('//') || trimmedLine.startsWith('*') || trimmedLine.startsWith('/*')) continue;
++
++            // Ignore numbers inside strings
++            let cleaned = line.replace(/([\"'`]).*?\1/g, '');
++
++            // === PATTERN 1: Variable assignments ===
++            // "type varName = number" or "varName = number"
++            const assignmentMatch = cleaned.match(/(?:(?:int|long|short|float|double|byte)\s+)?(\w+)\s*=\s*(\d+)/);
++
++            if (assignmentMatch) {
++                const varName = assignmentMatch[1];
++                const value = assignmentMatch[2];
++                const numValue = parseInt(value);
++
++                // Skip already well-named constants (ALL_CAPS)
++                if (!/^[A-Z_][A-Z0-9_]*$/.test(varName) && numValue > 1) {
++                    const suggestions = generateValueBasedSuggestions(varName, value, numValue);
++
++                    if (suggestions.length > 0) {
++                        allMagicNumbers.push({
++                            name: varName,
++                            value,
++                            type: 'int',
++                            file: file.fsPath,
++                            line: lineNumber,
++                            column: assignmentMatch.index || 0,
++                            language: guessLangFromExt(file.fsPath),
++                            category: 'magic_number',
++                            context: {
++                                type: 'variable_assignment',
++                                surroundingCode: cleaned,
++                                variableName: varName
++                            },
++                            suggestedNames: suggestions,
++                            confidence: 85,
++                            usageContext: `Variable "${varName}" = ${value}`
++                        });
++                    }
++                }
+             }
+-            // FLOATS: 1+ digits, dot, 1+ digits
+-            for (const m of cleaned.matchAll(/\b-?\d+\.\d+\b/g)) {
+-                const value = m[0];
+-                allMagicNumbers.push({
+-                    name: `MAGIC_${value.replace('.','_')}`,
+-                    value,
+-                    type: 'float',
+-                    file: file.fsPath,
+-                    line: lineNumber,
+-                    column: m.index,
+-                    language: guessLangFromExt(file.fsPath),
+-                    category: 'magic_number',
+-                    suggestedNames: [],
+-                });
++
++            // === PATTERN 2: Comparisons in if/while/for ===
++            // if(a < 8080), while(x > 100), for(i = 0; i < 50; i++)
++            const isComparison = /\b(if|else\s*if|while|for)\s*\(/.test(cleaned);
++            if (isComparison) {
++                // Find numbers in comparison operators: < > <= >= == !=
++                const comparisonMatches = cleaned.matchAll(/(?:<=|>=|<|>|==|!=)\s*(\d+)/g);
++
++                for (const m of comparisonMatches) {
++                    const value = m[1];
++                    const numValue = parseInt(value);
++
++                    // Skip trivial values
++                    if (numValue <= 1) continue;
++                    if (['10', '100', '1000'].includes(value)) continue;
++
++                    // Generate suggestions based on value
++                    const suggestions = generateValueBasedSuggestions('MAGIC', value, numValue);
++
++                    if (suggestions.length > 0) {
++                        allMagicNumbers.push({
++                            name: `MagicNumber_${value}`,
++                            value,
++                            type: 'int',
++                            file: file.fsPath,
++                            line: lineNumber,
++                            column: m.index || 0,
++                            language: guessLangFromExt(file.fsPath),
++                            category: 'magic_number',
++                            context: {
++                                type: 'comparison',
++                                surroundingCode: cleaned
++                            },
++                            suggestedNames: suggestions,
++                            confidence: 80,
++                            usageContext: `Comparison with ${value}`
++                        });
++                    }
++                }
++            }
++
++            // === PATTERN 3: Arithmetic operations ===
++            // price * 1.15 → TAX_RATE_MULTIPLIER, amount / 100 → PERCENTAGE_DIVISOR
++            const arithmeticMatches = cleaned.matchAll(/(\w+)\s*([*\/+\-])\s*(\d+\.?\d*)/g);
++
++            for (const m of arithmeticMatches) {
++                const varName = m[1];
++                const operator = m[2];
++                const value = m[3];
++                const numValue = parseFloat(value);
++
++                // Skip trivial values and already processed assignments
++                if (numValue <= 1 && operator !== '*' && operator !== '/') continue;
++                if (/^[A-Z_][A-Z0-9_]*$/.test(varName)) continue; // Already a constant
++
++                // Generate arithmetic-context suggestions
++                const suggestions = generateArithmeticSuggestions(varName, value, numValue, operator);
++
++                if (suggestions.length > 0) {
++                    allMagicNumbers.push({
++                        name: `Magic_${value.replace('.', '_')}`,
++                        value,
++                        type: value.includes('.') ? 'float' : 'int',
++                        file: file.fsPath,
++                        line: lineNumber,
++                        column: m.index || 0,
++                        language: guessLangFromExt(file.fsPath),
++                        category: 'magic_number',
++                        context: {
++                            type: 'calculation',
++                            surroundingCode: cleaned,
++                            operation: operator
++                        },
++                        suggestedNames: suggestions,
++                        confidence: 82,
++                        usageContext: `${varName} ${operator} ${value}`
++                    });
++                }
+             }
+         }
+     }
+     return allMagicNumbers;
+ }
+ 
++/**
++ * Generate naming suggestions based on the VALUE meaning.
++ * E.g., 8080 → port, 1024 → buffer size, 5000 → timeout
++ */
++function generateValueBasedSuggestions(varName: string, value: string, numValue: number): string[] {
++    const suggestions: string[] = [];
++    const upperVar = varName.toUpperCase();
++
++    // === NETWORK PORTS ===
++    if (numValue === 80) {
++        suggestions.push(`${upperVar}_HTTP_PORT`, 'HTTP_PORT', 'DEFAULT_PORT');
++    } else if (numValue === 443) {
++        suggestions.push(`${upperVar}_HTTPS_PORT`, 'HTTPS_PORT', 'SECURE_PORT');
++    } else if (numValue === 8080) {
++        suggestions.push(`${upperVar}_PORT`, 'SERVER_PORT', 'ALT_HTTP_PORT', 'DEV_PORT');
++    } else if (numValue === 3000) {
++        suggestions.push(`${upperVar}_PORT`, 'DEV_SERVER_PORT', 'NODE_PORT');
++    } else if (numValue === 5432) {
++        suggestions.push(`${upperVar}_PORT`, 'POSTGRES_PORT', 'DB_PORT');
++    } else if (numValue === 3306) {
++        suggestions.push(`${upperVar}_PORT`, 'MYSQL_PORT', 'DATABASE_PORT');
++    } else if (numValue === 27017) {
++        suggestions.push(`${upperVar}_PORT`, 'MONGO_PORT', 'NOSQL_PORT');
++    } else if (numValue === 6379) {
++        suggestions.push(`${upperVar}_PORT`, 'REDIS_PORT', 'CACHE_PORT');
++    }
++
++    // === BUFFER/MEMORY SIZES ===
++    else if (numValue === 1024) {
++        suggestions.push(`${upperVar}_SIZE`, 'BUFFER_SIZE', 'KILOBYTE', 'DEFAULT_BUFFER');
++    } else if (numValue === 2048) {
++        suggestions.push(`${upperVar}_SIZE`, 'LARGE_BUFFER_SIZE', 'RSA_KEY_SIZE');
++    } else if (numValue === 4096) {
++        suggestions.push(`${upperVar}_SIZE`, 'PAGE_SIZE', 'MAX_BUFFER_SIZE');
++    } else if (numValue === 8192) {
++        suggestions.push(`${upperVar}_SIZE`, 'LARGE_PAGE_SIZE', 'EXTENDED_BUFFER');
++    } else if (numValue === 256 || numValue === 512) {
++        suggestions.push(`${upperVar}_SIZE`, 'BLOCK_SIZE', 'CHUNK_SIZE');
++    }
++
++    // === TIMEOUTS (common milliseconds) ===
++    else if (numValue === 5000) {
++        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'DEFAULT_TIMEOUT_MS', 'CONNECTION_TIMEOUT');
++    } else if (numValue === 10000) {
++        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'LONG_TIMEOUT_MS', 'READ_TIMEOUT');
++    } else if (numValue === 30000) {
++        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'SESSION_TIMEOUT_MS', 'IDLE_TIMEOUT');
++    } else if (numValue === 60000) {
++        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'ONE_MINUTE_MS', 'MAX_TIMEOUT');
++    } else if (numValue === 1000) {
++        suggestions.push(`${upperVar}_MS`, 'ONE_SECOND_MS', 'MILLISECONDS_PER_SECOND');
++    }
++
++    // === TIME CONSTANTS ===
++    else if (numValue === 60) {
++        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_MINUTE', 'ONE_MINUTE');
++    } else if (numValue === 3600) {
++        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_HOUR', 'ONE_HOUR');
++    } else if (numValue === 86400) {
++        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_DAY', 'ONE_DAY');
++    } else if (numValue === 24) {
++        suggestions.push(`${upperVar}_HOURS`, 'HOURS_PER_DAY', 'MAX_HOURS');
++    } else if (numValue === 365) {
++        suggestions.push(`${upperVar}_DAYS`, 'DAYS_PER_YEAR', 'MAX_DAYS');
++    }
++
++    // === HTTP STATUS CODES ===
++    else if (numValue === 200) {
++        suggestions.push(`${upperVar}_STATUS`, 'HTTP_OK', 'SUCCESS_STATUS');
++    } else if (numValue === 404) {
++        suggestions.push(`${upperVar}_ERROR`, 'NOT_FOUND_ERROR', 'HTTP_NOT_FOUND');
++    } else if (numValue === 500) {
++        suggestions.push(`${upperVar}_ERROR`, 'SERVER_ERROR', 'HTTP_SERVER_ERROR');
++    } else if (numValue === 401) {
++        suggestions.push(`${upperVar}_ERROR`, 'UNAUTHORIZED_ERROR', 'HTTP_UNAUTHORIZED');
++    } else if (numValue === 403) {
++        suggestions.push(`${upperVar}_ERROR`, 'FORBIDDEN_ERROR', 'HTTP_FORBIDDEN');
++    }
++
++    // === RETRY/COUNT LIMITS (small numbers 2-10) ===
++    else if (numValue >= 2 && numValue <= 10) {
++        suggestions.push(`MAX_${upperVar}`, `${upperVar}_LIMIT`, `${upperVar}_COUNT`, 'MAX_RETRIES');
++    }
++
++    // === PERCENTAGES ===
++    else if (numValue === 50) {
++        suggestions.push(`${upperVar}_PERCENT`, 'HALF_PERCENT', 'MID_THRESHOLD');
++    } else if (numValue === 100) {
++        suggestions.push(`${upperVar}_PERCENT`, 'FULL_PERCENT', 'MAX_PERCENTAGE');
++    }
++
++    // === UNIX PERMISSIONS ===
++    else if (numValue === 755 || numValue === 644 || numValue === 777 || numValue === 700) {
++        suggestions.push(`${upperVar}_PERMISSION`, 'FILE_MODE', 'DIR_PERMISSION');
++    }
++
++    // === CRYPTO KEY SIZES ===
++    else if (numValue === 128 || numValue === 192) {
++        suggestions.push(`${upperVar}_KEY_SIZE`, 'AES_KEY_BITS', 'ENCRYPTION_BITS');
++    }
++
++    // === GENERIC VALUES ===
++    else if (numValue >= 100) {
++        suggestions.push(`${upperVar}_VALUE`, `${upperVar}_LIMIT`, `MAX_${upperVar}`);
++    }
++
++    // Remove duplicates and limit to 5
++    return [...new Set(suggestions)].slice(0, 5);
++}
++
++/**
++ * Generate suggestions for numbers in arithmetic operations.
++ * E.g., price * 1.15 → TAX_RATE_MULTIPLIER, amount / 100 → PERCENTAGE_DIVISOR
++ */
++function generateArithmeticSuggestions(varName: string, value: string, numValue: number, operator: string): string[] {
++    const suggestions: string[] = [];
++    const upperVar = varName.toUpperCase();
++    const isFloat = value.includes('.');
++
++    // === MULTIPLICATION CONTEXT ===
++    if (operator === '*') {
++        // Tax/fee rates (1.05 to 1.30)
++        if (numValue >= 1.01 && numValue <= 1.50) {
++            const percentage = Math.round((numValue - 1) * 100);
++            suggestions.push(`TAX_RATE_${percentage}_PERCENT`, 'TAX_RATE_MULTIPLIER', 'FEE_MULTIPLIER');
++            if (percentage === 15) suggestions.push('GST_RATE', 'TAX_RATE');
++            if (percentage === 18) suggestions.push('GST_RATE_18', 'SERVICE_TAX');
++            if (percentage === 5 || percentage === 10) suggestions.push('DISCOUNT_RATE', 'MARKUP_RATE');
++        }
++        // Discount multipliers (0.5 to 0.99)
++        else if (numValue >= 0.5 && numValue < 1) {
++            const discount = Math.round((1 - numValue) * 100);
++            suggestions.push(`DISCOUNT_${discount}_PERCENT`, 'DISCOUNT_MULTIPLIER', 'REDUCTION_FACTOR');
++        }
++        // Round number multipliers
++        else if (numValue === 2) suggestions.push('DOUBLE_MULTIPLIER', 'TIMES_TWO', 'DOUBLING_FACTOR');
++        else if (numValue === 10) suggestions.push('TIMES_TEN', 'DECIMAL_SHIFT', 'ORDER_MAGNITUDE');
++        else if (numValue === 100) suggestions.push('PERCENTAGE_BASE', 'CENTS_TO_DOLLAR', 'HUNDRED_MULTIPLIER');
++        else if (numValue === 1000) suggestions.push('KILO_MULTIPLIER', 'THOUSAND_FACTOR', 'MS_TO_SECONDS');
++    }
++
++    // === DIVISION CONTEXT ===
++    else if (operator === '/') {
++        if (numValue === 100) suggestions.push('PERCENTAGE_DIVISOR', 'TO_PERCENTAGE', 'HUNDRED_DIVISOR');
++        else if (numValue === 1000) suggestions.push('TO_KILO', 'THOUSAND_DIVISOR', 'SECONDS_TO_MS');
++        else if (numValue === 2) suggestions.push('HALF_DIVISOR', 'SPLIT_FACTOR', 'BISECT_DIVISOR');
++        else if (numValue === 60) suggestions.push('SECONDS_PER_MINUTE', 'TO_MINUTES', 'TIME_DIVISOR');
++        else if (numValue === 24) suggestions.push('HOURS_PER_DAY', 'TO_DAYS', 'DAY_DIVISOR');
++    }
++
++    // === ADDITION/SUBTRACTION CONTEXT ===
++    else if (operator === '+' || operator === '-') {
++        if (numValue === 1) suggestions.push('INCREMENT_VALUE', 'OFFSET_ONE', 'UNIT_ADJUSTMENT');
++        else if (numValue >= 2 && numValue <= 10) suggestions.push(`${upperVar}_OFFSET`, 'ADJUSTMENT_VALUE', 'MARGIN_VALUE');
++    }
++
++    // === GENERIC ARITHMETIC ===
++    if (suggestions.length === 0 && numValue > 1) {
++        if (isFloat) {
++            suggestions.push(`${upperVar}_FACTOR`, 'CONVERSION_RATE', 'MULTIPLIER_VALUE');
++        } else {
++            suggestions.push(`${upperVar}_CONSTANT`, 'ARITHMETIC_VALUE', 'CALCULATION_FACTOR');
++        }
++    }
++
++    return [...new Set(suggestions)].slice(0, 5);
++}
++
+ function guessLangFromExt(path: string): string {
+     if (path.endsWith('.java')) return 'java';
+     if (path.endsWith('.cpp') || path.endsWith('.cc') || path.endsWith('.cxx')) return 'cpp';
+diff --git a/src/constants/constantsTreeProvider.ts b/src/constants/constantsTreeProvider.ts
+index 9059195..3801ad5 100644
+--- a/src/constants/constantsTreeProvider.ts
++++ b/src/constants/constantsTreeProvider.ts
+@@ -12,7 +12,7 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+     private searchFilter: string = '';
+     private showOnlyWithSuggestions: boolean = false;
+ 
+-    constructor(private analyzer: ConstantsAnalyzer) {}
++    constructor(private analyzer: ConstantsAnalyzer) { }
+ 
+     refresh(): void {
+         this._onDidChangeTreeData.fire();
+@@ -53,13 +53,13 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+         } else if (element instanceof ConstantItemTreeItem) {
+             return Promise.resolve(element.suggestions);
+         }
+-        
++
+         return Promise.resolve([]);
+     }
+ 
+     private getRootItems(): ConstantTreeItem[] {
+         const filteredConstants = this.getFilteredConstants();
+-        
++
+         if (filteredConstants.length === 0) {
+             return [new NoConstantsItem()];
+         }
+@@ -84,12 +84,12 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+             if (this.searchFilter && !this.matchesSearch(constant)) {
+                 return false;
+             }
+-            
++
+             // Show only with suggestions filter
+             if (this.showOnlyWithSuggestions && constant.suggestedNames.length === 0) {
+                 return false;
+             }
+-            
++
+             return true;
+         });
+     }
+@@ -97,14 +97,14 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+     private matchesSearch(constant: ConstantInfo): boolean {
+         const searchLower = this.searchFilter;
+         return constant.name.toLowerCase().includes(searchLower) ||
+-               constant.value.toLowerCase().includes(searchLower) ||
+-               path.basename(constant.file).toLowerCase().includes(searchLower) ||
+-               constant.suggestedNames.some(name => name.toLowerCase().includes(searchLower));
++            constant.value.toLowerCase().includes(searchLower) ||
++            path.basename(constant.file).toLowerCase().includes(searchLower) ||
++            constant.suggestedNames.some(name => name.toLowerCase().includes(searchLower));
+     }
+ 
+     private groupByFile(constants: ConstantInfo[]): ConstantTreeItem[] {
+         const fileGroups = new Map<string, ConstantInfo[]>();
+-        
++
+         constants.forEach(constant => {
+             const fileName = path.basename(constant.file);
+             if (!fileGroups.has(fileName)) {
+@@ -118,13 +118,13 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+             const children = constants.map(constant => new ConstantItemTreeItem(constant));
+             const suggestionsCount = constants.filter(c => c.suggestedNames.length > 0).length;
+             const highConfidenceCount = constants.filter(c => c.confidence >= 80).length;
+-            
++
+             const statusIcon = suggestionsCount > 0 ? '💡' : '✅';
+-            const statusText = suggestionsCount > 0 ? 
+-                `${suggestionsCount} need suggestions` : 
++            const statusText = suggestionsCount > 0 ?
++                `${suggestionsCount} need suggestions` :
+                 'All well-named';
+-            
+-            items.push(new GroupTreeItem(fileName, children, 
++
++            items.push(new GroupTreeItem(fileName, children,
+                 `${statusIcon} 📄 ${fileName} (${constants.length} constants • ${statusText})`));
+         });
+ 
+@@ -137,7 +137,7 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+ 
+     private groupByType(constants: ConstantInfo[]): ConstantTreeItem[] {
+         const typeGroups = new Map<string, ConstantInfo[]>();
+-        
++
+         constants.forEach(constant => {
+             if (!typeGroups.has(constant.type)) {
+                 typeGroups.set(constant.type, []);
+@@ -162,7 +162,7 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+ 
+     private groupByCategory(constants: ConstantInfo[]): ConstantTreeItem[] {
+         const categoryGroups = new Map<string, ConstantInfo[]>();
+-        
++
+         constants.forEach(constant => {
+             if (!categoryGroups.has(constant.category)) {
+                 categoryGroups.set(constant.category, []);
+@@ -188,22 +188,22 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+     private groupBySuggestions(constants: ConstantInfo[]): ConstantTreeItem[] {
+         const withSuggestions = constants.filter(c => c.suggestedNames.length > 0);
+         const withoutSuggestions = constants.filter(c => c.suggestedNames.length === 0);
+-        
++
+         const items: GroupTreeItem[] = [];
+-        
++
+         if (withSuggestions.length > 0) {
+             const children = withSuggestions.map(constant => new ConstantItemTreeItem(constant));
+             const highConfidenceCount = withSuggestions.filter(c => c.confidence >= 80).length;
+-            items.push(new GroupTreeItem('with-suggestions', children, 
++            items.push(new GroupTreeItem('with-suggestions', children,
+                 `💡 Constants Needing Suggestions (${withSuggestions.length} • ${highConfidenceCount} high confidence)`));
+         }
+-        
++
+         if (withoutSuggestions.length > 0) {
+             const children = withoutSuggestions.map(constant => new ConstantItemTreeItem(constant));
+-            items.push(new GroupTreeItem('without-suggestions', children, 
++            items.push(new GroupTreeItem('without-suggestions', children,
+                 `✅ Well Named Constants (${withoutSuggestions.length})`));
+         }
+-        
++
+         return items;
+     }
+ 
+@@ -235,12 +235,12 @@ export class ConstantsTreeProvider implements vscode.TreeDataProvider<ConstantTr
+         const withSuggestions = this.constants.filter(c => c.suggestedNames.length > 0).length;
+         const highConfidence = this.constants.filter(c => c.confidence >= 70).length;
+         const files = new Set(this.constants.map(c => c.file)).size;
+-        
++
+         return { total, withSuggestions, highConfidence, files };
+     }
+ }
+ 
+-export abstract class ConstantTreeItem extends vscode.TreeItem {}
++export abstract class ConstantTreeItem extends vscode.TreeItem { }
+ 
+ export class NoConstantsItem extends ConstantTreeItem {
+     constructor() {
+@@ -268,17 +268,17 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
+ 
+     constructor(public readonly constant: ConstantInfo) {
+         super(constant.name, constant.suggestedNames.length > 0 ? vscode.TreeItemCollapsibleState.Collapsed : vscode.TreeItemCollapsibleState.None);
+-        
++
+         this.description = this.createDescription();
+         this.tooltip = this.createTooltip();
+         this.contextValue = constant.suggestedNames.length > 0 ? 'constantWithSuggestions' : 'constant';
+-        
++
+         // Set command based on whether suggestions are available
+         if (constant.suggestedNames.length > 0) {
+             this.command = {
+-                command: 'dependencyVisualizer.applyBestSuggestion',
+-                title: 'Apply Best Suggestion',
+-                arguments: [constant]
++                command: 'dependencyVisualizer.copyConstantName',
++                title: 'Copy Best Suggestion to Clipboard',
++                arguments: [constant.suggestedNames[0]]
+             };
+         } else {
+             this.command = {
+@@ -289,31 +289,31 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
+         }
+ 
+         this.iconPath = this.getIcon();
+-        
++
+         // Create suggestion items with apply buttons
+-        this.suggestions = constant.suggestedNames.map((suggestion, index) => 
++        this.suggestions = constant.suggestedNames.map((suggestion, index) =>
+             new SuggestionTreeItem(suggestion, constant, index === 0) // First suggestion is primary
+         );
+     }
+ 
+     private createDescription(): string {
+         const parts = [];
+-        
++
+         // Add value with type indicator
+         const typeIcon = this.getTypeIcon(this.constant.type);
+         parts.push(`${typeIcon} = ${this.constant.value}`);
+-        
++
+         if (this.constant.suggestedNames.length > 0) {
+-            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' : 
+-                                 this.constant.confidence >= 60 ? '💡' : '💭';
+-            const confidenceText = this.constant.confidence >= 80 ? 'High' : 
+-                                 this.constant.confidence >= 60 ? 'Medium' : 'Low';
+-            const actionText = this.constant.confidence >= 70 ? '🔥 Click to Apply Best' : '💡 Click to Apply Best';
++            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' :
++                this.constant.confidence >= 60 ? '💡' : '💭';
++            const confidenceText = this.constant.confidence >= 80 ? 'High' :
++                this.constant.confidence >= 60 ? 'Medium' : 'Low';
++            const actionText = '📋 Click to Copy';
+             parts.push(`${confidenceIcon} ${this.constant.suggestedNames.length} suggestion${this.constant.suggestedNames.length !== 1 ? 's' : ''} (${confidenceText} confidence) • ${actionText}`);
+         } else {
+             parts.push('✅ Well named');
+         }
+-        
++
+         return parts.join(' ');
+     }
+ 
+@@ -332,36 +332,36 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
+ 
+     private getIcon(): vscode.ThemeIcon {
+         const baseIcon = this.constant.category === 'string' ? 'symbol-string' :
+-                        this.constant.category === 'numeric' ? 'symbol-numeric' :
+-                        this.constant.category === 'boolean' ? 'symbol-boolean' : 'symbol-constant';
+-        
++            this.constant.category === 'numeric' ? 'symbol-numeric' :
++                this.constant.category === 'boolean' ? 'symbol-boolean' : 'symbol-constant';
++
+         let color: vscode.ThemeColor;
+         if (this.constant.suggestedNames.length > 0) {
+-            color = this.constant.confidence >= 80 ? 
+-                   new vscode.ThemeColor('charts.orange') : 
+-                   this.constant.confidence >= 60 ?
+-                   new vscode.ThemeColor('charts.yellow') :
+-                   new vscode.ThemeColor('charts.red');
++            color = this.constant.confidence >= 80 ?
++                new vscode.ThemeColor('charts.orange') :
++                this.constant.confidence >= 60 ?
++                    new vscode.ThemeColor('charts.yellow') :
++                    new vscode.ThemeColor('charts.red');
+         } else {
+             color = new vscode.ThemeColor('charts.green');
+         }
+-        
++
+         return new vscode.ThemeIcon(baseIcon, color);
+     }
+ 
+     private createTooltip(): vscode.MarkdownString {
+         const tooltip = new vscode.MarkdownString();
+         tooltip.isTrusted = true;
+-        
++
+         // Header with constant name and status
+         const statusIcon = this.constant.suggestedNames.length > 0 ? '💡' : '✅';
+         const statusText = this.constant.suggestedNames.length > 0 ? 'Needs Suggestions' : 'Well Named';
+         tooltip.appendMarkdown(`## ${statusIcon} ${this.constant.name}\n\n`);
+-        
++
+         // Status badge
+         const statusColor = this.constant.suggestedNames.length > 0 ? '#ff9800' : '#4caf50';
+         tooltip.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
+-        
++
+         // Constant details
+         tooltip.appendMarkdown(`**🔢 Value:** \`${this.constant.value}\`\n\n`);
+         tooltip.appendMarkdown(`**🔧 Type:** \`${this.constant.type}\`\n\n`);
+@@ -369,31 +369,31 @@ export class ConstantItemTreeItem extends ConstantTreeItem {
+         tooltip.appendMarkdown(`**📁 Scope:** ${this.constant.scope}\n\n`);
+         tooltip.appendMarkdown(`**📄 File:** \`${path.basename(this.constant.file)}\`\n\n`);
+         tooltip.appendMarkdown(`**📍 Line:** ${this.constant.line + 1}\n\n`);
+-        
++
+         if (this.constant.suggestedNames.length > 0) {
+-            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' : 
+-                                 this.constant.confidence >= 60 ? '💡' : '💭';
+-            const confidenceText = this.constant.confidence >= 80 ? 'High' : 
+-                                 this.constant.confidence >= 60 ? 'Medium' : 'Low';
++            const confidenceIcon = this.constant.confidence >= 80 ? '🔥' :
++                this.constant.confidence >= 60 ? '💡' : '💭';
++            const confidenceText = this.constant.confidence >= 80 ? 'High' :
++                this.constant.confidence >= 60 ? 'Medium' : 'Low';
+             tooltip.appendMarkdown(`**${confidenceIcon} Suggestions (${confidenceText} confidence - ${this.constant.confidence}%):**\n\n`);
+-            
+-            // Add "Apply Best Suggestion" button
++
++            // Add "Copy Best Suggestion" button
+             const bestSuggestion = this.constant.suggestedNames[0];
+-            const applyBestButton = `[🔥 Apply Best: \`${bestSuggestion}\`](command:dependencyVisualizer.applyBestSuggestion?${encodeURIComponent(JSON.stringify([this.constant]))})`;
+-            tooltip.appendMarkdown(`${applyBestButton}\n\n`);
+-            
+-            // List all suggestions
++            const copyBestButton = `[📋 Copy Best: \`${bestSuggestion}\`](command:dependencyVisualizer.copyConstantName?${encodeURIComponent(JSON.stringify([bestSuggestion]))})`;
++            tooltip.appendMarkdown(`${copyBestButton}\n\n`);
++
++            // List all suggestions with copy buttons
+             this.constant.suggestedNames.forEach((suggestion, index) => {
+                 const icon = index === 0 ? '⭐' : '💡';
+                 const label = index === 0 ? 'Recommended' : 'Alternative';
+-                const applyButton = `[Apply \`${suggestion}\`](command:dependencyVisualizer.applySuggestion?${encodeURIComponent(JSON.stringify([this.constant, suggestion]))})`;
+-                tooltip.appendMarkdown(`${icon} \`${suggestion}\` (${label}) ${applyButton}\n\n`);
++                const copyButton = `[Copy \`${suggestion}\`](command:dependencyVisualizer.copyConstantName?${encodeURIComponent(JSON.stringify([suggestion]))})`;
++                tooltip.appendMarkdown(`${icon} \`${suggestion}\` (${label}) ${copyButton}\n\n`);
+             });
+         } else {
+             tooltip.appendMarkdown(`✅ **Well named** - No suggestions needed\n\n`);
+             tooltip.appendMarkdown(`This constant follows good naming conventions and doesn't require any changes.`);
+         }
+-        
++
+         return tooltip;
+     }
+ }
+@@ -405,44 +405,44 @@ export class SuggestionTreeItem extends ConstantTreeItem {
+         public readonly isPrimary: boolean
+     ) {
+         super(suggestion, vscode.TreeItemCollapsibleState.None);
+-        
++
+         this.description = this.createDescription();
+         this.contextValue = 'constantSuggestion';
+         this.iconPath = new vscode.ThemeIcon(
+-            isPrimary ? 'star-full' : 'lightbulb', 
++            isPrimary ? 'star-full' : 'lightbulb',
+             new vscode.ThemeColor(isPrimary ? 'charts.orange' : 'charts.blue')
+         );
+-        
+-        // Make it clickable to apply the suggestion
++
++        // Make it clickable to copy the suggestion to clipboard
+         this.command = {
+-            command: 'dependencyVisualizer.applySuggestion',
+-            title: 'Apply Suggestion',
+-            arguments: [constant, suggestion]
++            command: 'dependencyVisualizer.copyConstantName',
++            title: 'Copy to Clipboard',
++            arguments: [suggestion]
+         };
+     }
+ 
+     private createDescription(): string {
+         const parts = [];
+-        
++
+         if (this.isPrimary) {
+             parts.push('⭐ Recommended');
+         } else {
+             parts.push('💡 Alternative');
+         }
+-        
++
+         // Add confidence indicator
+         const confidence = this.constant.confidence;
+         if (confidence >= 80) {
+-            parts.push('🔥 High Confidence');
++            parts.push('🔥 High');
+         } else if (confidence >= 60) {
+-            parts.push('💡 Medium Confidence');
++            parts.push('💡 Medium');
+         } else {
+-            parts.push('💭 Low Confidence');
++            parts.push('💭 Low');
+         }
+-        
+-        // Add apply button text
+-        parts.push('🔄 Click to Apply');
+-        
++
++        // Add copy button text
++        parts.push('📋 Click to Copy');
++
+         return parts.join(' • ');
+     }
+ }
+diff --git a/src/core/dependencyAnalyzer.ts b/src/core/dependencyAnalyzer.ts
+index 42a08df..f11dbfb 100644
+--- a/src/core/dependencyAnalyzer.ts
++++ b/src/core/dependencyAnalyzer.ts
+@@ -84,38 +84,38 @@ export class DependencyAnalyzer {
+     }
+ 
+     private async findJavaProjects(workspacePath: string): Promise<string[]> {
+-    const projects: string[] = [];
+-    const glob = require('glob');
++        const projects: string[] = [];
++        const glob = require('glob');
+ 
+-    // Find Maven projects
+-    const pomFiles = glob.sync('**/pom.xml', { cwd: workspacePath });
+-    projects.push(...pomFiles.map((f: string) => path.join(workspacePath, f)));
++        // Find Maven projects
++        const pomFiles = glob.sync('**/pom.xml', { cwd: workspacePath });
++        projects.push(...pomFiles.map((f: string) => path.join(workspacePath, f)));
+ 
+-    // Find Gradle projects
+-    const gradleFiles = glob.sync('**/build.gradle*', { cwd: workspacePath });
+-    projects.push(...gradleFiles.map((f: string) => path.join(workspacePath, f)));
++        // Find Gradle projects
++        const gradleFiles = glob.sync('**/build.gradle*', { cwd: workspacePath });
++        projects.push(...gradleFiles.map((f: string) => path.join(workspacePath, f)));
+ 
+-    return projects;
+-}
++        return projects;
++    }
+ 
+-private async findCppProjects(workspacePath: string): Promise<string[]> {
+-    const projects: string[] = [];
+-    const glob = require('glob');
++    private async findCppProjects(workspacePath: string): Promise<string[]> {
++        const projects: string[] = [];
++        const glob = require('glob');
+ 
+-    // Find CMake projects
+-    const cmakeFiles = glob.sync('**/CMakeLists.txt', { cwd: workspacePath });
+-    projects.push(...cmakeFiles.map((f: string) => path.join(workspacePath, f)));
++        // Find CMake projects
++        const cmakeFiles = glob.sync('**/CMakeLists.txt', { cwd: workspacePath });
++        projects.push(...cmakeFiles.map((f: string) => path.join(workspacePath, f)));
+ 
+-    // Find Conan projects
+-    const conanFiles = glob.sync('**/conanfile.*', { cwd: workspacePath });
+-    projects.push(...conanFiles.map((f: string) => path.join(workspacePath, f)));
++        // Find Conan projects
++        const conanFiles = glob.sync('**/conanfile.*', { cwd: workspacePath });
++        projects.push(...conanFiles.map((f: string) => path.join(workspacePath, f)));
+ 
+-    // Find vcpkg projects
+-    const vcpkgFiles = glob.sync('**/vcpkg.json', { cwd: workspacePath });
+-    projects.push(...vcpkgFiles.map((f: string) => path.join(workspacePath, f)));
++        // Find vcpkg projects
++        const vcpkgFiles = glob.sync('**/vcpkg.json', { cwd: workspacePath });
++        projects.push(...vcpkgFiles.map((f: string) => path.join(workspacePath, f)));
+ 
+-    return projects;
+-}
++        return projects;
++    }
+ 
+     // private async findCppProjects(workspacePath: string): Promise<string[]> {
+     //     const projects: string[] = [];
+@@ -140,7 +140,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+         try {
+             const dependencies = await this.javaParser.parseDependencies(buildFile);
+             const buildSystem = buildFile.includes('pom.xml') ? 'maven' : 'gradle';
+-            
++
+             return {
+                 type: 'java',
+                 buildSystem: buildSystem as 'maven' | 'gradle',
+@@ -157,13 +157,13 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+         try {
+             const dependencies = await this.cppParser.parseDependencies(buildFile);
+             let buildSystem: 'cmake' | 'conan' | 'vcpkg' = 'cmake';
+-            
++
+             if (buildFile.includes('conanfile')) {
+                 buildSystem = 'conan';
+             } else if (buildFile.includes('vcpkg.json')) {
+                 buildSystem = 'vcpkg';
+             }
+-            
++
+             return {
+                 type: 'cpp',
+                 buildSystem,
+@@ -180,16 +180,16 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+         for (const project of this.projects) {
+             // Check for version conflicts
+             const conflicts = this.conflictDetector.detectConflicts(project.dependencies);
+-            
++
+             // Check for missing libraries
+             const missingLibs = await this.checkMissingLibraries(project);
+-            
++
+             // Check platform compatibility
+             const platformIssues = this.platformChecker.checkCompatibility(project.dependencies);
+-            
++
+             // Update dependencies with issues
+             this.updateDependenciesWithIssues(project, conflicts, missingLibs, platformIssues);
+-            
++
+             // Create diagnostics
+             this.createDiagnostics(project, conflicts, missingLibs, platformIssues);
+         }
+@@ -197,14 +197,14 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+ 
+     private async checkMissingLibraries(project: ProjectInfo): Promise<string[]> {
+         const missing: string[] = [];
+-        
++
+         for (const dep of project.dependencies) {
+             if (dep.path && !fs.existsSync(dep.path)) {
+                 missing.push(dep.name);
+                 dep.missing = true;
+             }
+         }
+-        
++
+         return missing;
+     }
+ 
+@@ -234,7 +234,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+         platformIssues: string[]
+     ): void {
+         const uri = vscode.Uri.file(project.buildFile);
+-        
++
+         // Add conflict diagnostics
+         conflicts.forEach((versions, libName) => {
+             const diagnostic = new vscode.Diagnostic(
+@@ -244,7 +244,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+             );
+             this.diagnostics.push(diagnostic);
+         });
+-        
++
+         // Add missing library diagnostics
+         missingLibs.forEach(libName => {
+             const diagnostic = new vscode.Diagnostic(
+@@ -254,7 +254,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+             );
+             this.diagnostics.push(diagnostic);
+         });
+-        
++
+         // Add platform issue diagnostics
+         platformIssues.forEach(libName => {
+             const diagnostic = new vscode.Diagnostic(
+@@ -276,7 +276,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+ 
+ 
+ 
+-     // Make sure this method exists and returns FileConnection[]
++    // Make sure this method exists and returns FileConnection[]
+     async getFileConnections(): Promise<FileConnection[]> {
+         const connections: FileConnection[] = [];
+ 
+@@ -358,7 +358,7 @@ private async findCppProjects(workspacePath: string): Promise<string[]> {
+                 packageName: this.extractPackageName(document)
+             });
+         }
+-        
++
+         // Fallback: robust global regex
+         if (methods.length === 0) {
+             const regex = /^(?:\s*@[\w.]+(?:\([^)]*\))?\s*)*(?:\s*(?:public|private|protected|static|final|abstract|strictfp|synchronized|native)\s+)+\s*(?:<[^>]+>\s*)?([A-Za-z_$][\w\[\]<>.?$]*)\s+([A-Za-z_$]\w*)\s*\([^;{)]*\)\s*;/gm;
+diff --git a/src/extension.ts b/src/extension.ts
+index 2cf16c3..a008c4d 100644
+--- a/src/extension.ts
++++ b/src/extension.ts
+@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
+ 
+     // FIX: Create instance of RefactoringProvider instead of using static methods
+     const refactoringProvider = new RefactoringProvider();
+-    
++
+     // Register refactoring operations
+     refactoringProvider.registerOperation(new RenamingProvider());
+     refactoringProvider.registerOperation(new NativeMethodMover());
+@@ -49,17 +49,17 @@ export function activate(context: vscode.ExtensionContext) {
+     const libraryHighlighter = new LibraryHighlighter();
+ 
+     // Register the unified dashboard provider
+-const dashboardProvider = new DashboardProvider(
+-    context.extensionUri, 
+-    analyzer, 
+-    constantsAnalyzer, 
+-    refactoringProvider
+-);
+-
+-context.subscriptions.push(
+-    vscode.window.registerTreeDataProvider('dependencyTree', treeProvider),
+-    vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider),
+-);
++    const dashboardProvider = new DashboardProvider(
++        context.extensionUri,
++        analyzer,
++        constantsAnalyzer,
++        refactoringProvider
++    );
++
++    context.subscriptions.push(
++        vscode.window.registerTreeDataProvider('dependencyTree', treeProvider),
++        vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider),
++    );
+ 
+     // Activate library highlighter
+     libraryHighlighter.activate(context);
+@@ -109,9 +109,9 @@ context.subscriptions.push(
+                 vscode.window.showInformationMessage(`JNI index rebuilt: ${stats.symbols} symbols across ${stats.files} hits`);
+ 
+                 // Refresh views dependent on JNI connections
+-                try { await enhancedFileConnectionListProvider.updateConnections(); } catch {}
+-                try { statisticsProvider.updateStatistics(); } catch {}
+-                try { await webviewProvider.updateWebview(); } catch {}
++                try { await enhancedFileConnectionListProvider.updateConnections(); } catch { }
++                try { statisticsProvider.updateStatistics(); } catch { }
++                try { await webviewProvider.updateWebview(); } catch { }
+                 updateJniStatusBar();
+             });
+         }
+@@ -130,10 +130,10 @@ context.subscriptions.push(
+         async () => {
+             const stats = constantsTreeProvider.getStats();
+             const message = `📊 Constants Statistics:\n` +
+-                           `Total Constants: ${stats.total}\n` +
+-                           `With Suggestions: ${stats.withSuggestions}\n` +
+-                           `High Confidence: ${stats.highConfidence}\n` +
+-                           `Files: ${stats.files}`;
++                `Total Constants: ${stats.total}\n` +
++                `With Suggestions: ${stats.withSuggestions}\n` +
++                `High Confidence: ${stats.highConfidence}\n` +
++                `Files: ${stats.files}`;
+             vscode.window.showInformationMessage(message);
+         }
+     );
+@@ -145,7 +145,7 @@ context.subscriptions.push(
+                 prompt: 'Search constants',
+                 placeHolder: 'Enter constant name, value, or file name...'
+             });
+-            
++
+             if (searchTerm !== undefined) {
+                 constantsTreeProvider.setSearchFilter(searchTerm);
+             }
+@@ -161,11 +161,11 @@ context.subscriptions.push(
+                 { label: '🔹 Group by Category', value: 'category' as const },
+                 { label: '💡 Group by Suggestions', value: 'suggestions' as const }
+             ];
+-            
++
+             const selected = await vscode.window.showQuickPick(options, {
+                 placeHolder: 'Choose grouping method'
+             });
+-            
++
+             if (selected) {
+                 constantsTreeProvider.setGroupBy(selected.value);
+             }
+@@ -189,7 +189,7 @@ context.subscriptions.push(
+             const uri = vscode.Uri.file(constant.file);
+             const document = await vscode.workspace.openTextDocument(uri);
+             const editor = await vscode.window.showTextDocument(document);
+-            
++
+             const position = new vscode.Position(constant.line, constant.column);
+             editor.selection = new vscode.Selection(position, position);
+             editor.revealRange(new vscode.Range(position, position));
+@@ -201,15 +201,15 @@ context.subscriptions.push(
+         async (constant: any, suggestion: string) => {
+             const uri = vscode.Uri.file(constant.file);
+             const document = await vscode.workspace.openTextDocument(uri);
+-            
++
+             try {
+                 const workspaceEdit = new vscode.WorkspaceEdit();
+                 const line = document.lineAt(constant.line);
+                 const lineText = line.text;
+-                
++
+                 // Handle different constant declaration patterns
+                 let newLineText = lineText;
+-                
++
+                 if (constant.language === 'java') {
+                     // Java: static final TYPE NAME = value;
+                     const javaRegex = /(static\s+final\s+\w+\s+)([A-Z_][A-Z0-9_]*)(\s*=\s*[^;]+;)/;
+@@ -234,24 +234,24 @@ context.subscriptions.push(
+                         }
+                     }
+                 }
+-                
++
+                 // Apply the edit
+                 const range = new vscode.Range(constant.line, 0, constant.line, lineText.length);
+                 workspaceEdit.replace(uri, range, newLineText);
+-                
++
+                 const success = await vscode.workspace.applyEdit(workspaceEdit);
+-                
++
+                 if (success) {
+                     // Show success message with confidence
+-                    const confidenceIcon = constant.confidence >= 80 ? '🔥' : 
+-                                         constant.confidence >= 60 ? '💡' : '💭';
++                    const confidenceIcon = constant.confidence >= 80 ? '🔥' :
++                        constant.confidence >= 60 ? '💡' : '💭';
+                     vscode.window.showInformationMessage(
+                         `${confidenceIcon} Successfully renamed "${constant.name}" to "${suggestion}" (${constant.confidence}% confidence)`
+                     );
+-                    
++
+                     // Refresh the constants view
+                     await constantsTreeProvider.updateConstants();
+-                    
++
+                     // Show the change in the editor
+                     const editor = await vscode.window.showTextDocument(document);
+                     const position = new vscode.Position(constant.line, 0);
+@@ -278,6 +278,26 @@ context.subscriptions.push(
+         }
+     );
+ 
++    // Create output channel for logging constant naming changes
++    const constantsLogChannel = vscode.window.createOutputChannel('Constants Naming Log');
++
++    // Log helper function
++    const logConstantAction = (action: string, value: string, suggestion: string, file?: string, line?: number) => {
++        const timestamp = new Date().toISOString();
++        const location = file && line !== undefined ? ` at ${file}:${line + 1}` : '';
++        constantsLogChannel.appendLine(`[${timestamp}] ${action}: "${value}" → "${suggestion}"${location}`);
++    };
++
++    // NEW: Copy constant name to clipboard command
++    const copyConstantNameCommand = vscode.commands.registerCommand(
++        'dependencyVisualizer.copyConstantName',
++        async (suggestion: string) => {
++            await vscode.env.clipboard.writeText(suggestion);
++            vscode.window.showInformationMessage(`📋 Copied "${suggestion}" to clipboard`);
++            logConstantAction('COPIED', 'suggestion', suggestion);
++        }
++    );
++
+     const refreshConstantsCommand = vscode.commands.registerCommand(
+         'dependencyVisualizer.refreshConstants',
+         async () => {
+@@ -285,7 +305,7 @@ context.subscriptions.push(
+             vscode.window.showInformationMessage('Constants refreshed');
+         }
+     );
+-    
++
+     // Auto-refresh constants when files change
+     const constantsFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{java,cpp,cc,cxx,c,h,hpp}');
+     constantsFileWatcher.onDidChange(() => constantsTreeProvider.updateConstants());
+@@ -299,7 +319,7 @@ context.subscriptions.push(
+ 
+     // Initialize enhanced file connection list provider for the dedicated panel
+     const enhancedFileConnectionListProvider = new EnhancedFileConnectionListProvider(analyzer);
+-    
++
+     // Register the enhanced file connections tree view in the custom container
+     const enhancedFileConnectionsTreeView = vscode.window.createTreeView('enhancedFileConnectionsList', {
+         treeDataProvider: enhancedFileConnectionListProvider,
+@@ -331,10 +351,10 @@ context.subscriptions.push(
+         async () => {
+             const stats = enhancedFileConnectionListProvider.getStats();
+             const message = `📊 Connection Statistics:\n` +
+-                           `Total Methods: ${stats.total}\n` +
+-                           `Connected: ${stats.connected}\n` +
+-                           `Missing: ${stats.missing}\n` +
+-                           `Packages: ${stats.packages}`;
++                `Total Methods: ${stats.total}\n` +
++                `Connected: ${stats.connected}\n` +
++                `Missing: ${stats.missing}\n` +
++                `Packages: ${stats.packages}`;
+             vscode.window.showInformationMessage(message);
+         }
+     );
+@@ -346,7 +366,7 @@ context.subscriptions.push(
+                 prompt: 'Search file connections',
+                 placeHolder: 'Enter file name, method name, or package...'
+             });
+-            
++
+             if (searchTerm !== undefined) {
+                 enhancedFileConnectionListProvider.setSearchFilter(searchTerm);
+             }
+@@ -361,11 +381,11 @@ context.subscriptions.push(
+                 { label: '✅ Connected Only', value: 'connected' as const },
+                 { label: '❌ Missing Only', value: 'missing' as const }
+             ];
+-            
++
+             const selected = await vscode.window.showQuickPick(options, {
+                 placeHolder: 'Filter connections by status'
+             });
+-            
++
+             if (selected) {
+                 enhancedFileConnectionListProvider.setStatusFilter(selected.value);
+             }
+@@ -380,11 +400,11 @@ context.subscriptions.push(
+                 { label: '📦 Group by Package', value: 'package' as const },
+                 { label: '🎯 Group by Status', value: 'status' as const }
+             ];
+-            
++
+             const selected = await vscode.window.showQuickPick(options, {
+                 placeHolder: 'Choose grouping method'
+             });
+-            
++
+             if (selected) {
+                 enhancedFileConnectionListProvider.setGroupBy(selected.value);
+             }
+@@ -398,12 +418,12 @@ context.subscriptions.push(
+             if (item && item.connection && !item.connection.isMatched) {
+                 const jniSignature = generateJniSignature(item.connection);
+                 const stubCode = `JNIEXPORT void JNICALL ${jniSignature}(JNIEnv* env, jobject obj) {\n    // TODO: Implement ${item.connection.methodName}\n}\n`;
+-                
++
+                 const document = await vscode.workspace.openTextDocument({
+                     content: stubCode,
+                     language: 'cpp'
+                 });
+-                
++
+                 await vscode.window.showTextDocument(document);
+                 vscode.window.showInformationMessage('C++ stub generated! Save to your C++ file.');
+             }
+@@ -414,23 +434,23 @@ context.subscriptions.push(
+     const refreshAllCommand = vscode.commands.registerCommand(
+         'dependencyVisualizer.refreshAll',
+         async () => {
+-        // Refresh all data sources
+-        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+-        if (workspaceFolder) {
+-            await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
+-            await constantsAnalyzer.analyzeWorkspace(workspaceFolder);
+-        }
+-        
+-        // Refresh tree providers
+-        if (enhancedFileConnectionListProvider) {
+-            await enhancedFileConnectionListProvider.updateConnections();
+-        }
+-        if (constantsTreeProvider) {
+-            await constantsTreeProvider.updateConstants();
++            // Refresh all data sources
++            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
++            if (workspaceFolder) {
++                await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
++                await constantsAnalyzer.analyzeWorkspace(workspaceFolder);
++            }
++
++            // Refresh tree providers
++            if (enhancedFileConnectionListProvider) {
++                await enhancedFileConnectionListProvider.updateConnections();
++            }
++            if (constantsTreeProvider) {
++                await constantsTreeProvider.updateConstants();
++            }
++
++            vscode.window.showInformationMessage('✅ All data refreshed');
+         }
+-        
+-        vscode.window.showInformationMessage('✅ All data refreshed');
+-    }
+     );
+ 
+     context.subscriptions.push(refreshAllCommand);
+@@ -477,7 +497,7 @@ context.subscriptions.push(
+             }, async (progress) => {
+                 const result = await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
+                 treeProvider.refresh();
+-                
++
+                 // Show diagnostics
+                 const diagnostics = analyzer.getDiagnostics();
+                 if (diagnostics.length > 0) {
+@@ -493,7 +513,7 @@ context.subscriptions.push(
+         'dependencyVisualizer.showDependencyGraph',
+         () => {
+             webviewProvider.showDependencyGraph();
+-            
++
+             // Track usage
+             vscode.window.showInformationMessage(
+                 'Dependency Graph opened! 🎨 Use the controls to navigate and explore your dependencies.',
+@@ -518,7 +538,7 @@ context.subscriptions.push(
+                 vscode.window.showErrorMessage('No active editor found');
+                 return;
+             }
+-            
++
+             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+             if (!workspaceFolder) {
+                 vscode.window.showErrorMessage('No workspace folder found');
+@@ -531,31 +551,31 @@ context.subscriptions.push(
+                 selection: editor.selection,
+                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
+             };
+-            
++
+             // FIX: Use instance method instead of static method
+             const availableRefactorings = await refactoringProvider.getAvailableRefactorings(context);
+-            
++
+             if (availableRefactorings.length === 0) {
+                 vscode.window.showInformationMessage('No refactoring options available at current position');
+                 return;
+             }
+-            
++
+             // FIX: Add explicit type annotation to resolve implicit any error
+             interface RefactoringQuickPickItem extends vscode.QuickPickItem {
+                 refactoring: any; // You can create a more specific type if needed
+             }
+-            
++
+             const quickPickItems: RefactoringQuickPickItem[] = availableRefactorings.map((r: any) => ({
+                 label: r.title,
+                 description: r.description,
+                 refactoring: r
+             }));
+-            
++
+             const selectedRefactoring = await vscode.window.showQuickPick(
+                 quickPickItems,
+                 { placeHolder: 'Select refactoring operation' }
+             );
+-            
++
+             // FIX: Correct property access
+             if (selectedRefactoring) {
+                 await refactoringProvider.executeRefactoring(selectedRefactoring.refactoring.id, context);
+@@ -586,7 +606,7 @@ context.subscriptions.push(
+         async () => {
+             const editor = vscode.window.activeTextEditor;
+             if (!editor) return;
+-            
++
+             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+             if (!workspaceFolder) return;
+ 
+@@ -596,7 +616,7 @@ context.subscriptions.push(
+                 selection: editor.selection,
+                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
+             };
+-            
++
+             const renamingProvider = new RenamingProvider();
+             if (await renamingProvider.canApply(context)) {
+                 const workspaceEdit = await renamingProvider.apply(context);
+@@ -610,7 +630,7 @@ context.subscriptions.push(
+         async () => {
+             const editor = vscode.window.activeTextEditor;
+             if (!editor) return;
+-            
++
+             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+             if (!workspaceFolder) return;
+ 
+@@ -620,7 +640,7 @@ context.subscriptions.push(
+                 selection: editor.selection,
+                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
+             };
+-            
++
+             const constantExtractor = new ConstantExtractor();
+             if (await constantExtractor.canApply(context)) {
+                 const workspaceEdit = await constantExtractor.apply(context);
+@@ -648,18 +668,18 @@ context.subscriptions.push(
+         async () => {
+             const editor = vscode.window.activeTextEditor;
+             if (!editor) return;
+-            
++
+             console.log('Document language:', editor.document.languageId);
+             console.log('Selection:', editor.selection);
+             console.log('Selected text:', editor.document.getText(editor.selection));
+-            
++
+             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
+             console.log('Workspace folder:', workspaceFolder?.uri.fsPath);
+-            
++
+             // Test file finding
+             const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
+             console.log('Found C++ files:', cppFiles.map(f => f.fsPath));
+-            
++
+             vscode.window.showInformationMessage('Debug info logged to console');
+         }
+     );
+@@ -678,11 +698,13 @@ context.subscriptions.push(
+         goToConstantCommand,
+         applySuggestionCommand,
+         applyBestSuggestionCommand,
++        copyConstantNameCommand,
++        constantsLogChannel,
+         refreshConstantsCommand,
+         constantsFileWatcher,
+         // Tree views
+         enhancedFileConnectionsTreeView,
+-        
++
+         // File connection related commands
+         openFileCommand,
+         showStatsCommand,
+@@ -693,21 +715,21 @@ context.subscriptions.push(
+         showJniIndexStatsCommand,
+         generateStubCommand,
+         refreshAllCommand,
+-        
++
+         // Main dependency commands
+         analyzeCommand,
+         showGraphCommand,
+         refreshCommand,
+         refactorCommand,
+         executeRefactoringCommand,
+-        
++
+         // Individual refactoring commands
+         renameCommand,
+         extractConstantCommand,
+-        
++
+         // Debug command
+         debugCommand,
+-        
++
+         // Watchers
+         fileWatcher,
+         connectionFileWatcher,
+@@ -720,4 +742,4 @@ function generateJniSignature(connection: any): string {
+     return `Java_com_example_Class_${connection.methodName}`;
+ }
+ 
+-export function deactivate() {}
++export function deactivate() { }
+diff --git a/src/features/libraryHighlighter.ts b/src/features/libraryHighlighter.ts
+index ac54420..e8265b8 100644
+--- a/src/features/libraryHighlighter.ts
++++ b/src/features/libraryHighlighter.ts
+@@ -199,7 +199,7 @@ export class LibraryHighlighter {
+         // Warm JNI index in background for fast lookups
+         const analyzer = getAnalyzer();
+         if (analyzer) {
+-            analyzer.rebuildJniIndex?.().catch(() => {});
++            analyzer.rebuildJniIndex?.().catch(() => { });
+         }
+     }
+ 
+@@ -231,8 +231,8 @@ export class LibraryHighlighter {
+         // Add library call code lenses
+         for (const call of libraryCalls) {
+             const status = this.checkLibraryStatus(call.libraryName);
+-            const statusText = status.status === 'missing' ? 'Missing' : 
+-                              status.status === 'wrong_extension' ? 'Wrong Extension' : 'Ready';
++            const statusText = status.status === 'missing' ? 'Missing' :
++                status.status === 'wrong_extension' ? 'Wrong Extension' : 'Ready';
+             const command: vscode.Command = {
+                 title: `${this.getStatusIcon(status.status)} ${call.libraryName} • ${statusText}`,
+                 command: 'dependencyVisualizer.showLibraryInfo',
+@@ -246,10 +246,10 @@ export class LibraryHighlighter {
+         for (const method of nativeMethods) {
+             // Check implementation status for this method
+             const updatedMethodInfo = await this.checkNativeMethodImplementation(method.methodInfo);
+-            
++
+             const statusText = updatedMethodInfo.status === 'implemented' ? 'Implemented' : 'Missing Implementation';
+             const icon = updatedMethodInfo.status === 'implemented' ? '🔗' : '🔗❌';
+-            
++
+             // For implemented methods, add a "Go to Implementation" command
+             if (updatedMethodInfo.status === 'implemented') {
+                 const goToCommand: vscode.Command = {
+@@ -272,7 +272,7 @@ export class LibraryHighlighter {
+     }
+ 
+     private async refreshHighlights(): Promise<void> {
+-        const editors = vscode.window.visibleTextEditors.filter(editor => 
++        const editors = vscode.window.visibleTextEditors.filter(editor =>
+             editor.document.languageId === 'java'
+         );
+ 
+@@ -433,12 +433,9 @@ export class LibraryHighlighter {
+ 
+     private extractClassName(document: vscode.TextDocument): string {
+         const content = document.getText();
+-        // Prefer a public class if present
+-        const publicMatch = content.match(/\bpublic\s+class\s+(\w+)/);
+-        if (publicMatch) return publicMatch[1];
+-        // Fallback to any class declaration (top-most occurrence)
+-        const anyMatch = content.match(/\bclass\s+(\w+)/);
+-        return anyMatch ? anyMatch[1] : 'UnknownClass';
++        // Match class declaration at start of line (prevents matching within comments)
++        const match = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
++        return match ? match[1] : 'UnknownClass';
+     }
+ 
+     private extractPackageName(document: vscode.TextDocument): string {
+@@ -467,7 +464,7 @@ export class LibraryHighlighter {
+ 
+         // Generate the expected JNI function name
+         let expectedFunctionName = `Java_${methodInfo.className}_${methodInfo.methodName}`;
+-        
++
+         // If there's a package, include it in the function name
+         if (methodInfo.packageName) {
+             const packagePrefix = methodInfo.packageName.replace(/\./g, '_');
+@@ -486,23 +483,23 @@ export class LibraryHighlighter {
+                     const doc = await vscode.workspace.openTextDocument(found);
+                     const content = doc.getText();
+                     methodInfo.implementationLine = this.findImplementationLine(content, expectedFunctionName);
+-                } catch {}
++                } catch { }
+                 return methodInfo;
+             }
+-        } catch {}
++        } catch { }
+ 
+         // First, look for implementation files (.cpp, .cc, .cxx, .c) - these contain the actual implementation
+         const implementationFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c}');
+-        
++
+         // Slow path: Search for the JNI function in implementation files
+         for (const implFile of implementationFiles) {
+             try {
+                 const implDocument = await vscode.workspace.openTextDocument(implFile);
+                 const implContent = implDocument.getText();
+-                
++
+                 // Look for JNI function with the expected name (allow variants without JNIEXPORT/JNICALL and overload suffixes)
+                 const jniFunctionRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
+-                
++
+                 if (jniFunctionRegex.test(implContent)) {
+                     methodInfo.cppImplementationExists = true;
+                     methodInfo.status = 'implemented';
+@@ -518,15 +515,15 @@ export class LibraryHighlighter {
+ 
+         // If not found in implementation files, check header files (.h, .hpp) for declarations
+         const headerFiles = await vscode.workspace.findFiles('**/*.{h,hpp}');
+-        
++
+         for (const headerFile of headerFiles) {
+             try {
+                 const headerDocument = await vscode.workspace.openTextDocument(headerFile);
+                 const headerContent = headerDocument.getText();
+-                
++
+                 // Look for JNI function declaration with the expected name (allow overload suffixes)
+                 const jniDeclRegex = new RegExp(`\\b${expectedFunctionName}(?:__[-_A-Za-z0-9$]+)?\\s*\\(`, 'g');
+-                
++
+                 if (jniDeclRegex.test(headerContent)) {
+                     methodInfo.cppImplementationExists = true;
+                     methodInfo.status = 'implemented';
+@@ -559,13 +556,13 @@ export class LibraryHighlighter {
+             try {
+                 const document = await vscode.workspace.openTextDocument(methodInfo.implementationFile);
+                 const editor = await vscode.window.showTextDocument(document);
+-                
++
+                 // Go to the specific line where the implementation is
+                 const line = methodInfo.implementationLine || 1;
+                 const position = new vscode.Position(line - 1, 0);
+                 editor.selection = new vscode.Selection(position, position);
+                 editor.revealRange(new vscode.Range(position, position), vscode.TextEditorRevealType.InCenter);
+-                
++
+                 // Show a notification if we're in a header file
+                 if (methodInfo.isHeaderFile) {
+                     vscode.window.showInformationMessage(
+@@ -582,7 +579,7 @@ export class LibraryHighlighter {
+ 
+     private getLibraryAtPosition(document: vscode.TextDocument, position: vscode.Position): { libraryName: string; range: vscode.Range } | undefined {
+         const libraryCalls = this.findLibraryCalls(document);
+-        
++
+         for (const call of libraryCalls) {
+             if (call.range.contains(position)) {
+                 return call;
+@@ -594,7 +591,7 @@ export class LibraryHighlighter {
+ 
+     private getNativeMethodAtPosition(document: vscode.TextDocument, position: vscode.Position): { methodInfo: NativeMethodInfo; range: vscode.Range } | undefined {
+         const nativeMethods = this.findNativeMethods(document);
+-        
++
+         for (const method of nativeMethods) {
+             if (method.range.contains(position)) {
+                 return method;
+@@ -606,15 +603,17 @@ export class LibraryHighlighter {
+ 
+     private checkLibraryStatus(libraryName: string): LibraryInfo {
+         const expectedExtension = this.getExpectedExtension();
++        const validExtensions = this.getValidExtensions();
+         const possiblePaths = this.getPossibleLibraryPaths(libraryName, expectedExtension);
+-        
++
+         let fileExists = false;
+         let extensionMatches = false;
+ 
+-        for (const path of possiblePaths) {
+-            if (fs.existsSync(path)) {
++        for (const libPath of possiblePaths) {
++            if (fs.existsSync(libPath)) {
+                 fileExists = true;
+-                if (path.endsWith(`.${expectedExtension}`)) {
++                // Check if the file matches any of the valid extensions for this platform
++                if (validExtensions.some(ext => libPath.endsWith(`.${ext}`))) {
+                     extensionMatches = true;
+                     break;
+                 }
+@@ -647,12 +646,25 @@ export class LibraryHighlighter {
+             case 'linux':
+                 return 'so';
+             case 'darwin':
+-                return 'dylib';
++                return 'jnilib'; // macOS JNI libraries can use .jnilib or .dylib
+             default:
+                 return 'so';
+         }
+     }
+ 
++    private getValidExtensions(): string[] {
++        switch (this.currentPlatform) {
++            case 'win32':
++                return ['dll'];
++            case 'linux':
++                return ['so'];
++            case 'darwin':
++                return ['jnilib', 'dylib']; // macOS supports both .jnilib and .dylib
++            default:
++                return ['so'];
++        }
++    }
++
+     private getPossibleLibraryPaths(libraryName: string, expectedExtension: string): string[] {
+         const candidates: string[] = [];
+         const workspaceFolders = vscode.workspace.workspaceFolders;
+@@ -776,17 +788,17 @@ export class LibraryHighlighter {
+     private createHoverMessage(libraryName: string, status: LibraryInfo): vscode.MarkdownString {
+         const markdown = new vscode.MarkdownString();
+         markdown.isTrusted = true;
+-        
++
+         // Header with library name and status
+         const statusIcon = this.getStatusIcon(status.status);
+         const statusText = status.status.toUpperCase().replace('_', ' ');
+         markdown.appendMarkdown(`## ${statusIcon} Library: \`${libraryName}\`\n\n`);
+-        
++
+         // Status badge
+-        const statusColor = status.status === 'missing' ? '#f44336' : 
+-                           status.status === 'wrong_extension' ? '#2196f3' : '#4caf50';
++        const statusColor = status.status === 'missing' ? '#f44336' :
++            status.status === 'wrong_extension' ? '#2196f3' : '#4caf50';
+         markdown.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
+-        
++
+         // Platform information
+         markdown.appendMarkdown(`**🖥️ Platform:** ${this.getPlatformName(status.currentPlatform)}\n`);
+         markdown.appendMarkdown(`**📁 Expected Extension:** \`.${status.expectedExtension}\`\n\n`);
+@@ -826,16 +838,16 @@ export class LibraryHighlighter {
+     private createNativeMethodHoverMessage(methodInfo: NativeMethodInfo): vscode.MarkdownString {
+         const markdown = new vscode.MarkdownString();
+         markdown.isTrusted = true;
+-        
++
+         // Header with method name and status
+         const statusIcon = methodInfo.status === 'implemented' ? '🔗' : '🔗❌';
+         const statusText = methodInfo.status === 'implemented' ? 'IMPLEMENTED' : 'MISSING IMPLEMENTATION';
+         markdown.appendMarkdown(`## ${statusIcon} Native Method: \`${methodInfo.methodName}\`\n\n`);
+-        
++
+         // Status badge
+         const statusColor = methodInfo.status === 'implemented' ? '#4caf50' : '#f44336';
+         markdown.appendMarkdown(`<span style="background-color: ${statusColor}; color: white; padding: 2px 8px; border-radius: 12px; font-size: 0.8em; font-weight: bold;">${statusText}</span>\n\n`);
+-        
++
+         // Method information
+         markdown.appendMarkdown(`**🏗️ Class:** \`${methodInfo.className}\`\n`);
+         if (methodInfo.packageName) {
+@@ -910,7 +922,7 @@ export class LibraryHighlighter {
+     private async showLibraryInfo(libraryName: string): Promise<void> {
+         const status = this.checkLibraryStatus(libraryName);
+         const message = this.createInfoMessage(libraryName, status);
+-        
++
+         vscode.window.showInformationMessage(message, 'Refresh', 'Show Details').then(selection => {
+             if (selection === 'Refresh') {
+                 this.refreshHighlights();
+@@ -923,7 +935,7 @@ export class LibraryHighlighter {
+     private createInfoMessage(libraryName: string, status: LibraryInfo): string {
+         const icon = this.getStatusIcon(status.status);
+         const platform = this.getPlatformName(status.currentPlatform);
+-        
++
+         switch (status.status) {
+             case 'missing':
+                 return `${icon} Library '${libraryName}' not found for ${platform} (expected .${status.expectedExtension})`;
+diff --git a/src/refactoring/nativeMethodCopier.ts b/src/refactoring/nativeMethodCopier.ts
+index 8d252c5..cf0ceca 100644
+--- a/src/refactoring/nativeMethodCopier.ts
++++ b/src/refactoring/nativeMethodCopier.ts
+@@ -55,13 +55,13 @@ export class NativeMethodCopier implements RefactoringOperation {
+         }
+ 
+         const workspaceEdit = new vscode.WorkspaceEdit();
+-        
++
+         // 1. Copy Java method to target class
+         await this.copyJavaMethod(context, methodInfo, target, workspaceEdit);
+-        
++
+         // 2. Create corresponding JNI C++ method
+         await this.createJniImplementation(context, methodInfo, target, workspaceEdit);
+-        
++
+         return workspaceEdit;
+     }
+ 
+@@ -71,11 +71,11 @@ export class NativeMethodCopier implements RefactoringOperation {
+             return { title: 'Copy Native Method', changes: [] };
+         }
+ 
+-        const changes: Array<{file: string; oldContent: string; newContent: string; diff: string}> = [];
+-        
++        const changes: Array<{ file: string; oldContent: string; newContent: string; diff: string }> = [];
++
+         // Preview would show the target Java file with the new method
+         // and the target C++ file with the new JNI method
+-        
++
+         return {
+             title: `Copy Native Method: ${methodInfo.methodName}`,
+             changes
+@@ -85,7 +85,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+     private async extractNativeMethodInfo(context: RefactoringContext): Promise<NativeMethodInfo | null> {
+         const document = context.document;
+         const position = context.selection.active;
+-        
++
+         // Find the method that contains the current position
+         const methodRange = await this.findMethodRange(document, position);
+         if (!methodRange) {
+@@ -93,7 +93,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+         }
+ 
+         const methodText = document.getText(methodRange);
+-        
++
+         // Parse native method signature
+         // Allow flexible modifier order (e.g., 'native private', annotations, generics, arrays)
+         const nativeMethodRegex = new RegExp(
+@@ -112,7 +112,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+             'm'
+         );
+         let match = methodText.match(nativeMethodRegex);
+-        
++
+         // Fallback: search a nearby window around the cursor with a looser pattern if strict match fails
+         if (!match) {
+             const docText = document.getText();
+@@ -153,21 +153,21 @@ export class NativeMethodCopier implements RefactoringOperation {
+             }
+             return null;
+         }
+-        
++
+         const returnType = match[1];
+         const methodName = match[2];
+         const parametersStr = match[3];
+-        
++
+         // Extract class and package information
+         const className = this.extractClassName(document);
+         const packageName = this.extractPackageName(document);
+-        
++
+         // Parse parameters
+         const parameters = this.parseParameters(parametersStr);
+-        
++
+         // Generate JNI signature
+         const jniSignature = this.generateJniSignature(packageName, className, methodName);
+-        
++
+         return {
+             methodName,
+             className,
+@@ -248,7 +248,8 @@ export class NativeMethodCopier implements RefactoringOperation {
+ 
+     private extractClassName(document: vscode.TextDocument): string {
+         const text = document.getText();
+-        const classMatch = text.match(/class\s+(\w+)/);
++        // Match class declaration at start of line (prevents matching within comments)
++        const classMatch = text.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
+         return classMatch ? classMatch[1] : 'UnknownClass';
+     }
+ 
+@@ -262,7 +263,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+         if (!parametersStr.trim()) {
+             return [];
+         }
+-        
++
+         return parametersStr.split(',').map(param => param.trim());
+     }
+ 
+@@ -284,7 +285,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+         try {
+             const dirEntries = await fs.readdir(currentDir);
+             javaFilesInDir = dirEntries.filter(f => f.endsWith('.java'))
+-                                       .map(f => path.join(currentDir, f));
++                .map(f => path.join(currentDir, f));
+         } catch (err) {
+             console.warn('Unable to list current directory for QuickPick:', err);
+         }
+@@ -333,17 +334,18 @@ export class NativeMethodCopier implements RefactoringOperation {
+         return { packageName, className, filePath: selectedFile };
+     }
+ 
+-    
+-    private async extractPackageAndClassFromFile(filePath: string): Promise<{packageName: string, className: string}> {
++
++    private async extractPackageAndClassFromFile(filePath: string): Promise<{ packageName: string, className: string }> {
+         try {
+             const content = await fs.readFile(filePath, 'utf8');
+-            
++
+             const packageMatch = content.match(/package\s+([\w.]+);/);
+             const packageName = packageMatch ? packageMatch[1] : '';
+-            
+-            const classMatch = content.match(/class\s+(\w+)/);
++
++            // Match class declaration at start of line (prevents matching within comments)
++            const classMatch = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
+             const className = classMatch ? classMatch[1] : path.basename(filePath, '.java');
+-            
++
+             return { packageName, className };
+         } catch (error) {
+             return { packageName: '', className: path.basename(filePath, '.java') };
+@@ -361,15 +363,15 @@ export class NativeMethodCopier implements RefactoringOperation {
+         }
+ 
+         const targetUri = vscode.Uri.file(target.filePath);
+-        
++
+         try {
+             const targetDocument = await vscode.workspace.openTextDocument(targetUri);
+             const targetContent = targetDocument.getText();
+-            
++
+             // Find a good place to insert the method (before the last closing brace)
+             const lines = targetContent.split('\n');
+             let insertLine = lines.length - 1;
+-            
++
+             // Find the last closing brace of the class
+             for (let i = lines.length - 1; i >= 0; i--) {
+                 if (lines[i].trim() === '}') {
+@@ -377,13 +379,13 @@ export class NativeMethodCopier implements RefactoringOperation {
+                     break;
+                 }
+             }
+-            
++
+             // Create the method to insert
+             const methodToInsert = `\n    // Copied from ${methodInfo.className}\n    ${methodInfo.fullMethodSignature}\n`;
+-            
++
+             const insertPosition = new vscode.Position(insertLine, 0);
+             workspaceEdit.insert(targetUri, insertPosition, methodToInsert);
+-            
++
+         } catch (error) {
+             vscode.window.showErrorMessage(`Failed to copy method to target file: ${error}`);
+         }
+@@ -402,25 +404,25 @@ export class NativeMethodCopier implements RefactoringOperation {
+         }
+ 
+         const cppUri = vscode.Uri.file(cppFilePath);
+-        
++
+         // Generate JNI method signature for target class
+         const targetJniSignature = this.generateJniSignature(target.packageName, target.className, methodInfo.methodName);
+-        
++
+         // Create JNI method implementation
+         const jniMethod = this.generateJniMethodImplementation(targetJniSignature, methodInfo);
+-        
++
+         try {
+             // Check if file exists
+             let insertPosition: vscode.Position;
+-            
++
+             try {
+                 const cppDocument = await vscode.workspace.openTextDocument(cppUri);
+                 const cppContent = cppDocument.getText();
+-                
++
+                 // Insert at the end of the file
+                 const lines = cppContent.split('\n');
+                 insertPosition = new vscode.Position(lines.length, 0);
+-                
++
+                 workspaceEdit.insert(cppUri, insertPosition, `\n${jniMethod}\n`);
+             } catch (error) {
+                 // File doesn't exist, create it
+@@ -428,7 +430,7 @@ export class NativeMethodCopier implements RefactoringOperation {
+                 workspaceEdit.createFile(cppUri, { overwrite: false });
+                 workspaceEdit.insert(cppUri, new vscode.Position(0, 0), fileContent);
+             }
+-            
++
+         } catch (error) {
+             vscode.window.showErrorMessage(`Failed to create JNI implementation: ${error}`);
+         }
+@@ -459,14 +461,14 @@ export class NativeMethodCopier implements RefactoringOperation {
+             `${target.className.toLowerCase()}.cpp`,
+             `${target.className}.cpp`
+         ];
+-        
++
+         const possiblePaths = [
+             path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'cpp'),
+             path.join(workspaceFolder.uri.fsPath, 'cpp'),
+             path.join(workspaceFolder.uri.fsPath, 'native'),
+             path.join(workspaceFolder.uri.fsPath, 'jni')
+         ];
+-        
++
+         // Check if any existing file exists
+         for (const basePath of possiblePaths) {
+             for (const fileName of possibleNames) {
+@@ -479,11 +481,11 @@ export class NativeMethodCopier implements RefactoringOperation {
+                 }
+             }
+         }
+-        
++
+         // No existing file found, create new one
+         const defaultPath = possiblePaths[0]; // Use first path as default
+         const defaultFileName = possibleNames[0]; // Use first name as default
+-        
++
+         try {
+             await fs.mkdir(defaultPath, { recursive: true });
+             return path.join(defaultPath, defaultFileName);
+@@ -500,10 +502,10 @@ export class NativeMethodCopier implements RefactoringOperation {
+             const [type] = param.trim().split(/\s+/);
+             return this.javaToJniType(type);
+         });
+-        
++
+         // Generate parameter list
+         const paramList = ['JNIEnv *env', 'jobject thiz', ...jniParams.map((type, index) => `${type} param${index}`)].join(', ');
+-        
++
+         return `
+ // JNI implementation for ${methodInfo.methodName}
+ JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
+@@ -559,7 +561,7 @@ JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
+         if (jniReturnType === 'void') {
+             return '';
+         }
+-        
++
+         const defaultValues: { [key: string]: string } = {
+             'jboolean': 'return JNI_FALSE;',
+             'jbyte': 'return 0;',
+diff --git a/src/refactoring/nativeMethodMover.ts b/src/refactoring/nativeMethodMover.ts
+index eedcffe..65acbfb 100644
+--- a/src/refactoring/nativeMethodMover.ts
++++ b/src/refactoring/nativeMethodMover.ts
+@@ -52,16 +52,16 @@ export class NativeMethodMover implements RefactoringOperation {
+         }
+ 
+         const workspaceEdit = new vscode.WorkspaceEdit();
+-        
++
+         // 1. Move Java method
+         await this.moveJavaMethod(context, methodInfo, target, workspaceEdit);
+-        
++
+         // 2. Update JNI implementation
+         await this.updateJniImplementation(context, methodInfo, target, workspaceEdit);
+-        
++
+         // 3. Update CMakeLists.txt if needed
+         await this.updateCMakeFiles(context, methodInfo, target, workspaceEdit);
+-        
++
+         return workspaceEdit;
+     }
+ 
+@@ -71,16 +71,16 @@ export class NativeMethodMover implements RefactoringOperation {
+             return { title: 'Move Native Method', changes: [] };
+         }
+ 
+-        const changes: Array<{file: string; oldContent: string; newContent: string; diff: string}> = [];
+-        
++        const changes: Array<{ file: string; oldContent: string; newContent: string; diff: string }> = [];
++
+         // Preview Java file changes
+         const javaChanges = await this.previewJavaChanges(context, methodInfo);
+         changes.push(...javaChanges);
+-        
++
+         // Preview C++ file changes
+         const cppChanges = await this.previewCppChanges(context, methodInfo);
+         changes.push(...cppChanges);
+-        
++
+         return {
+             title: `Move Native Method: ${methodInfo.methodName}`,
+             changes
+@@ -198,12 +198,12 @@ export class NativeMethodMover implements RefactoringOperation {
+ 
+         // Step 1: Scan available packages in the open folder
+         const packages = await this.scanPackages(workspaceFolder.uri.fsPath);
+-        
++
+         // Step 2: Prepare QuickPick items for packages
+         const quickPickItems: vscode.QuickPickItem[] = [
+             { label: '$(folder-opened) Browse for target file...', description: 'Select from filesystem', alwaysShow: true }
+         ];
+-        
++
+         packages.forEach(pkg => {
+             quickPickItems.push({
+                 label: pkg.packageName,
+@@ -238,21 +238,21 @@ export class NativeMethodMover implements RefactoringOperation {
+ 
+             const selectedFile = fileUris[0].fsPath;
+             const { packageName, className } = this.extractPackageAndClassFromFile(selectedFile, workspaceFolder.uri.fsPath);
+-            
++
+             return { packageName, className, filePath: selectedFile };
+         } else {
+             // Package selected - now show existing classes/files in that package
+             const packagePath = path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'java', selectedPackage.label.replace(/\./g, path.sep));
+-            
++
+             const classItems: vscode.QuickPickItem[] = [
+                 { label: '$(new-file) Create New Class...', description: 'Create a new class in this package', alwaysShow: true }
+             ];
+-            
++
+             // Scan for existing .java files in the package directory
+             try {
+                 const files = await fs.readdir(packagePath);
+                 const javaFiles = files.filter(file => file.endsWith('.java'));
+-                
++
+                 javaFiles.forEach(file => {
+                     const className = file.replace('.java', '');
+                     classItems.push({
+@@ -301,12 +301,12 @@ export class NativeMethodMover implements RefactoringOperation {
+     }
+ 
+     // NEW: Scan packages in the open folder
+-    private async scanPackages(workspacePath: string): Promise<Array<{packageName: string; path: string; classCount: number}>> {
+-        const packages: Array<{packageName: string; path: string; classCount: number}> = [];
+-        
++    private async scanPackages(workspacePath: string): Promise<Array<{ packageName: string; path: string; classCount: number }>> {
++        const packages: Array<{ packageName: string; path: string; classCount: number }> = [];
++
+         // Assume standard Java source structure: src/main/java
+         const javaSrcPath = path.join(workspacePath, 'src', 'main', 'java');
+-        
++
+         try {
+             await fs.access(javaSrcPath); // Check if path exists
+         } catch {
+@@ -319,7 +319,7 @@ export class NativeMethodMover implements RefactoringOperation {
+             let classCount = 0;
+             try {
+                 const entries = await fs.readdir(currentPath, { withFileTypes: true });
+-                
++
+                 for (const entry of entries) {
+                     const entryPath = path.join(currentPath, entry.name);
+                     if (entry.isDirectory()) {
+@@ -345,23 +345,23 @@ export class NativeMethodMover implements RefactoringOperation {
+         };
+ 
+         await scanDir(javaSrcPath, '');
+-        
++
+         // Sort by package name
+         packages.sort((a, b) => a.packageName.localeCompare(b.packageName));
+-        
++
+         return packages;
+     }
+ 
+     // NEW: Extract package and class from file path (relative to workspace)
+-    private extractPackageAndClassFromFile(filePath: string, workspacePath: string): {packageName: string; className: string} {
++    private extractPackageAndClassFromFile(filePath: string, workspacePath: string): { packageName: string; className: string } {
+         const relativePath = path.relative(workspacePath, filePath);
+         const className = path.basename(relativePath, '.java');
+         const dirPath = path.dirname(relativePath);
+-        
++
+         // Derive package from directory structure (assuming src/main/java root)
+         const packageParts = dirPath.split(path.sep).filter(part => part && !['src', 'main', 'java'].includes(part));
+         const packageName = packageParts.join('.');
+-        
++
+         return { packageName, className };
+     }
+ 
+@@ -374,21 +374,21 @@ export class NativeMethodMover implements RefactoringOperation {
+     ): Promise<void> {
+         const document = context.document;
+         const position = context.selection.active;
+-        
++
+         // Find the complete method declaration
+         const methodRange = await this.findMethodRange(document, position);
+         if (!methodRange) {
+             return;
+         }
+-        
++
+         const methodText = document.getText(methodRange);
+-        
++
+         // Remove from current class
+         workspaceEdit.delete(document.uri, methodRange);
+-        
++
+         // Find or create target class file
+         const targetClassFile = await this.findOrCreateTargetClass(target, workspaceEdit);
+-        
++
+         // Add to target class
+         await this.addMethodToTargetClass(targetClassFile, methodText, workspaceEdit);
+     }
+@@ -401,28 +401,28 @@ export class NativeMethodMover implements RefactoringOperation {
+     ): Promise<void> {
+         // Find corresponding C/C++ source and header files
+         const cppFiles = await this.findCppFiles(context.workspaceFolder);
+-        
++
+         for (const cppFile of cppFiles) {
+             const document = await vscode.workspace.openTextDocument(cppFile);
+             const content = document.getText();
+-            
++
+             // Find JNI function implementation
+             const oldJniName = this.generateJniSignature(
+                 methodInfo.packageName,
+                 methodInfo.className,
+                 methodInfo.methodName
+             );
+-            
++
+             const newJniName = this.generateJniSignature(
+                 target.packageName,
+                 target.className,
+                 methodInfo.methodName
+             );
+-            
++
+             // Replace JNI function signatures (Java_qualifiedName_method) across impl and headers
+             const escapedOld = oldJniName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+             const updatedContent = content.replace(new RegExp(`Java_${escapedOld}`, 'g'), `Java_${newJniName}`);
+-            
++
+             if (updatedContent !== content) {
+                 const fullRange = new vscode.Range(
+                     document.positionAt(0),
+@@ -440,11 +440,11 @@ export class NativeMethodMover implements RefactoringOperation {
+         workspaceEdit: vscode.WorkspaceEdit
+     ): Promise<void> {
+         const cmakeFiles = await vscode.workspace.findFiles('**/CMakeLists.txt');
+-        
++
+         for (const cmakeFile of cmakeFiles) {
+             const document = await vscode.workspace.openTextDocument(cmakeFile);
+             const content = document.getText();
+-            
++
+             // Look for JNI-related configurations that might need updating
+             // (This is a placeholder; customize based on your CMake setup)
+             const jniConfigRegex = /find_package\s*\(\s*JNI\s+REQUIRED\s*\)/g;
+@@ -458,7 +458,8 @@ export class NativeMethodMover implements RefactoringOperation {
+ 
+     private extractClassName(document: vscode.TextDocument): string {
+         const content = document.getText();
+-        const classMatch = content.match(/class\s+(\w+)/);
++        // Match actual class declaration, not comments containing "class"
++        const classMatch = content.match(/(?:public|private|protected|abstract|final|\s)*\bclass\s+(\w+)/);
+         return classMatch ? classMatch[1] : '';
+     }
+ 
+@@ -472,7 +473,7 @@ export class NativeMethodMover implements RefactoringOperation {
+         if (!parametersStr.trim()) {
+             return [];
+         }
+-        
++
+         return parametersStr.split(',').map(param => param.trim());
+     }
+ 
+@@ -484,21 +485,21 @@ export class NativeMethodMover implements RefactoringOperation {
+     private async findMethodRange(document: vscode.TextDocument, position: vscode.Position): Promise<vscode.Range | null> {
+         const text = document.getText();
+         const lines = text.split('\n');
+-        
++
+         // Find method start and end
+         let startLine = position.line;
+         let endLine = position.line;
+-        
++
+         // Find method start (look for native keyword)
+         while (startLine > 0 && !lines[startLine].includes('native')) {
+             startLine--;
+         }
+-        
++
+         // Find method end (look for semicolon)
+         while (endLine < lines.length - 1 && !lines[endLine].includes(';')) {
+             endLine++;
+         }
+-        
++
+         return new vscode.Range(
+             new vscode.Position(startLine, 0),
+             new vscode.Position(endLine, lines[endLine].length)
+@@ -530,7 +531,7 @@ export class NativeMethodMover implements RefactoringOperation {
+         const classFileName = `${target.className}.java`;
+         const newFilePath = path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'java', packagePath, classFileName);
+         const newFileUri = vscode.Uri.file(newFilePath);
+-        
++
+         try {
+             await fs.access(newFilePath);
+             return newFileUri;
+@@ -550,11 +551,11 @@ export class NativeMethodMover implements RefactoringOperation {
+     ): Promise<void> {
+         const document = await vscode.workspace.openTextDocument(targetFile);
+         const content = document.getText();
+-        
++
+         // Find the class body end
+         const classEndRegex = /}\s*$/;
+         const match = classEndRegex.exec(content);
+-        
++
+         if (match) {
+             const insertPosition = document.positionAt(match.index);
+             workspaceEdit.insert(targetFile, insertPosition, `\n    ${methodText}\n`);
+@@ -567,12 +568,12 @@ export class NativeMethodMover implements RefactoringOperation {
+         return files;
+     }
+ 
+-    private async previewJavaChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{file: string; oldContent: string; newContent: string; diff: string}>> {
++    private async previewJavaChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{ file: string; oldContent: string; newContent: string; diff: string }>> {
+         // Implementation for previewing Java changes (stub; expand as needed)
+         return [];
+     }
+ 
+-    private async previewCppChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{file: string; oldContent: string; newContent: string; diff: string}>> {
++    private async previewCppChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{ file: string; oldContent: string; newContent: string; diff: string }>> {
+         // Implementation for previewing C++ changes (stub; expand as needed)
+         return [];
+     }
+diff --git a/src/refactoring/renamingProvider.ts b/src/refactoring/renamingProvider.ts
+index c422c0f..df705e2 100644
+--- a/src/refactoring/renamingProvider.ts
++++ b/src/refactoring/renamingProvider.ts
+@@ -13,12 +13,12 @@ export class RenamingProvider implements RefactoringOperation {
+         // Check if current position is on a symbol
+         const document = context.document;
+         const position = context.selection.active;
+-        
++
+         const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+             'vscode.executeDocumentSymbolProvider',
+             document.uri
+         );
+-        
++
+         return this.findSymbolAtPosition(symbols || [], position) !== null;
+     }
+ 
+@@ -42,36 +42,36 @@ export class RenamingProvider implements RefactoringOperation {
+ 
+         const workspaceEdit = new vscode.WorkspaceEdit();
+         const references = await this.findAllReferences(context);
+-        
++
+         for (const ref of references) {
+             workspaceEdit.replace(ref.uri, ref.range, newName);
+         }
+-        
++
+         // Handle special cases for cross-language renaming
+         if (context.language === 'java') {
+             await this.handleJavaRenaming(context, newName, workspaceEdit);
+         } else if (context.language === 'cpp') {
+             await this.handleCppRenaming(context, newName, workspaceEdit);
+         }
+-        
++
+         return workspaceEdit;
+     }
+ 
+     async preview(context: RefactoringContext): Promise<RefactoringPreview> {
+         const references = await this.findAllReferences(context);
+-        const changes: Array<{file: string; oldContent: string; newContent: string; diff: string}> = [];
+-        
++        const changes: Array<{ file: string; oldContent: string; newContent: string; diff: string }> = [];
++
+         for (const ref of references) {
+             const document = await vscode.workspace.openTextDocument(ref.uri);
+             const oldContent = document.getText();
+-            
++
+             // FIX: Get the actual text from the range instead of using character position
+             const oldText = document.getText(ref.range);
+             const newContent = oldContent.replace(
+                 new RegExp(`\\b${this.escapeRegex(oldText)}\\b`, 'g'),
+                 'NEW_NAME'
+             );
+-            
++
+             changes.push({
+                 file: ref.uri.fsPath,
+                 oldContent,
+@@ -79,7 +79,7 @@ export class RenamingProvider implements RefactoringOperation {
+                 diff: this.generateDiff(oldContent, newContent)
+             });
+         }
+-        
++
+         return {
+             title: `Rename Symbol`,
+             changes
+@@ -89,31 +89,31 @@ export class RenamingProvider implements RefactoringOperation {
+     private async findAllReferences(context: RefactoringContext): Promise<vscode.Location[]> {
+         const document = context.document;
+         const position = context.selection.active;
+-        
++
+         const references = await vscode.commands.executeCommand<vscode.Location[]>(
+             'vscode.executeReferenceProvider',
+             document.uri,
+             position
+         );
+-        
++
+         return references || [];
+     }
+ 
+     // FIX: Added missing handleJavaRenaming method
+     private async handleJavaRenaming(
+-        context: RefactoringContext, 
+-        newName: string, 
++        context: RefactoringContext,
++        newName: string,
+         workspaceEdit: vscode.WorkspaceEdit
+     ): Promise<void> {
+         const document = context.document;
+         const position = context.selection.active;
+-        
++
+         // Check if renaming a class or method
+         const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
+             'vscode.executeDocumentSymbolProvider',
+             document.uri
+         );
+-        
++
+         const symbol = this.findSymbolAtPosition(symbols || [], position);
+         if (symbol) {
+             if (symbol.kind === vscode.SymbolKind.Class) {
+@@ -124,10 +124,10 @@ export class RenamingProvider implements RefactoringOperation {
+                         path.dirname(document.uri.fsPath),
+                         `${newName}.java`
+                     );
+-                    
++
+                     workspaceEdit.renameFile(document.uri, vscode.Uri.file(newFilePath));
+                 }
+-                
++
+                 // Handle JNI class renaming in C/C++ files
+                 await this.handleJniClassRenaming(context, symbol.name, newName, workspaceEdit);
+             } else if (symbol.kind === vscode.SymbolKind.Method) {
+@@ -149,19 +149,19 @@ export class RenamingProvider implements RefactoringOperation {
+         workspaceEdit: vscode.WorkspaceEdit
+     ): Promise<void> {
+         console.log(`🔄 Updating JNI class signatures: ${oldClassName} -> ${newClassName}`);
+-        
++
+         // Find corresponding C++ files in the workspace
+         const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
+         console.log(`📁 Found ${cppFiles.length} C++ files:`, cppFiles.map(f => f.fsPath));
+-        
++
+         for (const cppFile of cppFiles) {
+             const document = await vscode.workspace.openTextDocument(cppFile);
+             const content = document.getText();
+-            
++
+             // Look for JNI function signatures that match the old class name
+             const packageName = this.extractPackageName(context.document);
+             console.log(`📦 Package name extracted: ${packageName}`);
+-            
++
+             if (packageName) {
+                 const oldJniPrefix = this.createJniClassPrefix(packageName, oldClassName);
+                 const newJniPrefix = this.createJniClassPrefix(packageName, newClassName);
+@@ -170,7 +170,7 @@ export class RenamingProvider implements RefactoringOperation {
+                 if (oldJniPrefix && newJniPrefix) {
+                     // Find and replace JNI class signatures with precise targeting
+                     const edits = this.findAndReplaceJniClassFunctions(document, oldJniPrefix, newJniPrefix);
+-                    
++
+                     if (edits.length > 0) {
+                         console.log(`✅ Found ${edits.length} JNI class function occurrences in ${cppFile.fsPath}`);
+                         for (const edit of edits) {
+@@ -192,34 +192,34 @@ export class RenamingProvider implements RefactoringOperation {
+         workspaceEdit: vscode.WorkspaceEdit
+     ): Promise<void> {
+         console.log(`🔄 Updating JNI method signatures: ${oldMethodName} -> ${newMethodName}`);
+-        
++
+         // Find corresponding C++ files in the workspace
+         const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
+         console.log(`📁 Found ${cppFiles.length} C++ files:`, cppFiles.map(f => f.fsPath));
+-        
++
+         // Extract class name from the Java file
+         const className = this.extractClassName(context.document);
+         const packageName = this.extractPackageName(context.document);
+-        
++
+         if (!className || !packageName) {
+             console.log(`❌ Could not extract class name or package name`);
+             return;
+         }
+-        
++
+         for (const cppFile of cppFiles) {
+             const document = await vscode.workspace.openTextDocument(cppFile);
+             const content = document.getText();
+-            
++
+             // Create JNI function signature pattern
+             const jniClassPrefix = this.createJniClassPrefix(packageName, className);
+             if (jniClassPrefix) {
+                 const oldJniFunction = `${jniClassPrefix}_${oldMethodName}`;
+                 const newJniFunction = `${jniClassPrefix}_${newMethodName}`;
+                 console.log(`🔧 JNI method signature update: ${oldJniFunction} -> ${newJniFunction}`);
+-                
++
+                 // Find and replace specific JNI function occurrences with precise targeting
+                 const edits = this.findAndReplaceJniFunction(document, oldJniFunction, newJniFunction);
+-                
++
+                 if (edits.length > 0) {
+                     console.log(`✅ Found ${edits.length} JNI function occurrences in ${cppFile.fsPath}`);
+                     for (const edit of edits) {
+@@ -240,22 +240,22 @@ export class RenamingProvider implements RefactoringOperation {
+         // Handle C++ specific renaming logic
+         const document = context.document;
+         const content = document.getText();
+-        
++
+         // Check for JNI function signatures
+         const jniRegex = /JNIEXPORT\s+\w+\s+JNICALL\s+Java_[\w_]+_(\w+)/g;
+         let match;
+-        
++
+         while ((match = jniRegex.exec(content)) !== null) {
+             const oldFunctionName = match[1];
+             const fullMatch = match[0];
+-            
++
+             // Replace JNI function name
+             const newJniName = fullMatch.replace(oldFunctionName, newName);
+             const range = new vscode.Range(
+                 document.positionAt(match.index),
+                 document.positionAt(match.index + fullMatch.length)
+             );
+-            
++
+             workspaceEdit.replace(document.uri, range, newJniName);
+         }
+     }
+@@ -270,31 +270,32 @@ export class RenamingProvider implements RefactoringOperation {
+         if (!packageName || !className) {
+             return null;
+         }
+-        
++
+         const jniClassName = packageName.replace(/\./g, '_') + '_' + className;
+         return `Java_${jniClassName}`;
+     }
+ 
+     private extractClassName(document: vscode.TextDocument): string | null {
+         const content = document.getText();
+-        const classMatch = content.match(/(?:public\s+)?class\s+(\w+)/);
++        // Match class declaration at start of line (prevents matching within comments)
++        const classMatch = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
+         return classMatch ? classMatch[1] : null;
+     }
+ 
+     // Helper method to find and replace JNI function signatures with precise targeting
+     private findAndReplaceJniFunction(
+-        document: vscode.TextDocument, 
+-        oldJniFunction: string, 
++        document: vscode.TextDocument,
++        oldJniFunction: string,
+         newJniFunction: string
+-    ): Array<{range: vscode.Range, newText: string}> {
++    ): Array<{ range: vscode.Range, newText: string }> {
+         const content = document.getText();
+-        const edits: Array<{range: vscode.Range, newText: string}> = [];
+-        
++        const edits: Array<{ range: vscode.Range, newText: string }> = [];
++
+         // Look for JNI function signatures in various contexts:
+         // 1. JNIEXPORT ... JNICALL Java_package_Class_method
+         // 2. Function definitions: Java_package_Class_method(...)
+         // 3. Function declarations in headers
+-        
++
+         const patterns = [
+             // JNIEXPORT return_type JNICALL Java_package_Class_method
+             new RegExp(`(JNIEXPORT\s+\w+\s+JNICALL\s+)${this.escapeRegex(oldJniFunction)}\\b`, 'g'),
+@@ -303,25 +304,25 @@ export class RenamingProvider implements RefactoringOperation {
+             // Function declaration in header
+             new RegExp(`\\b${this.escapeRegex(oldJniFunction)}(?=\\s*;)`, 'g')
+         ];
+-        
++
+         for (const pattern of patterns) {
+             let match;
+             while ((match = pattern.exec(content)) !== null) {
+                 const matchStart = match.index + (match[1] ? match[1].length : 0);
+                 const matchEnd = matchStart + oldJniFunction.length;
+-                
++
+                 const range = new vscode.Range(
+                     document.positionAt(matchStart),
+                     document.positionAt(matchEnd)
+                 );
+-                
++
+                 edits.push({
+                     range,
+                     newText: newJniFunction
+                 });
+             }
+         }
+-        
++
+         return edits;
+     }
+ 
+@@ -330,10 +331,10 @@ export class RenamingProvider implements RefactoringOperation {
+         document: vscode.TextDocument,
+         oldJniPrefix: string,
+         newJniPrefix: string
+-    ): Array<{range: vscode.Range, newText: string}> {
++    ): Array<{ range: vscode.Range, newText: string }> {
+         const content = document.getText();
+-        const edits: Array<{range: vscode.Range, newText: string}> = [];
+-        
++        const edits: Array<{ range: vscode.Range, newText: string }> = [];
++
+         // Look for JNI class function patterns: Java_package_OldClass_methodName
+         const patterns = [
+             // JNIEXPORT return_type JNICALL Java_package_Class_method
+@@ -343,26 +344,26 @@ export class RenamingProvider implements RefactoringOperation {
+             // Function declaration in header
+             new RegExp(`\\b${this.escapeRegex(oldJniPrefix)}_([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*;)`, 'g')
+         ];
+-        
++
+         for (const pattern of patterns) {
+             let match;
+             while ((match = pattern.exec(content)) !== null) {
+                 const prefixStart = match.index + (match[1] ? match[1].length : 0);
+                 const prefixEnd = prefixStart + oldJniPrefix.length;
+                 const methodName = match[match.length - 1]; // Last capture group is the method name
+-                
++
+                 const range = new vscode.Range(
+                     document.positionAt(prefixStart),
+                     document.positionAt(prefixEnd)
+                 );
+-                
++
+                 edits.push({
+                     range,
+                     newText: newJniPrefix
+                 });
+             }
+         }
+-        
++
+         return edits;
+     }
+ 
+@@ -374,7 +375,7 @@ export class RenamingProvider implements RefactoringOperation {
+                 if (childSymbol) {
+                     return childSymbol;
+                 }
+-                
++
+                 // Check if position is on the symbol name
+                 if (symbol.selectionRange.contains(position)) {
+                     return symbol;
+diff --git a/test/ConstantsDemo.cpp b/test/ConstantsDemo.cpp
+index df704ba..6c40a5e 100644
+--- a/test/ConstantsDemo.cpp
++++ b/test/ConstantsDemo.cpp
+@@ -1,22 +1,7 @@
+ #include <iostream>
+ 
+ // Magic numbers that should get suggestions
+-#define MAGIC_42 42  // Should suggest MAX_RETRIES, RETRY_COUNT, etc.
+-#define MAGIC_1024 1024  // Should suggest DEFAULT_BUFFER_SIZE, BUFFER_CAPACITY, etc.
+-#define MAGIC_8080 8080  // Should suggest ALTERNATIVE_HTTP_PORT, DEV_PORT, etc.
+-#define MAGIC_5000 5000  // Should suggest DEFAULT_TIMEOUT_MS, CONNECTION_TIMEOUT_MS, etc.
+-
+-// Time-related constants
+-#define MAGIC_1000 1000  // Should suggest MILLISECONDS_PER_SECOND, MS_PER_SECOND, etc.
+-#define MAGIC_3600 3600  // Should suggest SECONDS_PER_HOUR, HOUR_IN_SECONDS, etc.
+-
+-// UI-related constants
+-#define MAGIC_800 800  // Should suggest DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, etc.
+-#define MAGIC_600 600  // Should suggest DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, etc.
+-
+-// Error codes
+-#define MAGIC_404 404  // Should suggest NOT_FOUND_ERROR, RESOURCE_NOT_FOUND, etc.
+-#define MAGIC_500 500  // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
++ // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
+ 
+ // Well-named constants (should not get suggestions)
+ const int MAX_CONNECTIONS = 100;
+@@ -47,4 +32,23 @@ public:
+         double pi = 3.14159;       // Should suggest PI_VALUE, MATH_PI, etc.
+         double e = 2.718;          // Should suggest EULER_NUMBER, MATH_E, etc.
+     }
+-}; 
+\ No newline at end of file
++};
++
++
++// NEW: Retry limit test cases
++void connectWithRetry() {
++    int maxRetries = 3;           // Should suggest MAX_RETRIES, RETRY_LIMIT
++    int pollAttempts = 5;         // Should suggest MAX_POLL_ATTEMPTS, POLL_RETRY_LIMIT
++}
++
++     // Should suggest CARRIAGE_RETURN, CR_CHAR
++
++// NEW: Bit flag test cases
++void checkFlags() {
++    int flag1 = 1;                // Bit flag for enabled
++    int flag2 = 2;                // Bit flag for active  
++    int flag4 = 4;                // Bit flag for visible
++    int combined = flag1 | flag2; // Bitwise OR
++}
++
++       // Should suggest HALF_PERCENT, MID_THRESHOLD 
+\ No newline at end of file
+diff --git a/test/ConstantsDemo.java b/test/ConstantsDemo.java
+index 70ca6b0..63eabaf 100644
+--- a/test/ConstantsDemo.java
++++ b/test/ConstantsDemo.java
+@@ -1,21 +1,21 @@
+ public class ConstantsDemo {
+     // Magic numbers that should get suggestions
+-    static final int MAGIC_42 = 42;  // Should suggest MAX_RETRIES, RETRY_COUNT, etc.
+-    static final int MAGIC_1024 = 1024;  // Should suggest DEFAULT_BUFFER_SIZE, BUFFER_CAPACITY, etc.
+-    static final int MAGIC_8080 = 8080;  // Should suggest ALTERNATIVE_HTTP_PORT, DEV_PORT, etc.
+-    static final int MAGIC_5000 = 5000;  // Should suggest DEFAULT_TIMEOUT_MS, CONNECTION_TIMEOUT_MS, etc.
++    static final int balu = 42;  // Should suggest MAX_RETRIES, RETRY_COUNT, etc.
++    static final int shubham = 1024;  // Should suggest DEFAULT_BUFFER_SIZE, BUFFER_CAPACITY, etc.
++    static final int Ajinkya = 8080;  // Should suggest ALTERNATIVE_HTTP_PORT, DEV_PORT, etc.
++    static final int aj5000 = 5000;  // Should suggest DEFAULT_TIMEOUT_MS, CONNECTION_TIMEOUT_MS, etc.
+     
+     // Time-related constants
+-    static final int MAGIC_1000 = 1000;  // Should suggest MILLISECONDS_PER_SECOND, MS_PER_SECOND, etc.
+-    static final int MAGIC_3600 = 3600;  // Should suggest SECONDS_PER_HOUR, HOUR_IN_SECONDS, etc.
++    static final int aj1000 = 1000;  // Should suggest MILLISECONDS_PER_SECOND, MS_PER_SECOND, etc.
++    static final int aj3600 = 3600;  // Should suggest SECONDS_PER_HOUR, HOUR_IN_SECONDS, etc.
+     
+     // UI-related constants
+-    static final int MAGIC_800 = 800;  // Should suggest DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, etc.
+-    static final int MAGIC_600 = 600;  // Should suggest DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, etc.
++    static final int aj800 = 800;  // Should suggest DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, etc.
++    static final int aj600 = 600;  // Should suggest DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, etc.
+     
+     // Error codes
+-    static final int MAGIC_404 = 404;  // Should suggest NOT_FOUND_ERROR, RESOURCE_NOT_FOUND, etc.
+-    static final int MAGIC_500 = 500;  // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
++    static final int aj404 = 404;  // Should suggest NOT_FOUND_ERROR, RESOURCE_NOT_FOUND, etc.
++    static final int aj500 = 500;  // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
+     
+     // Well-named constants (should not get suggestions)
+     static final int MAX_CONNECTIONS = 100;
+@@ -36,4 +36,31 @@ public class ConstantsDemo {
+         int windowWidth = 1024;    // Should suggest LARGE_WINDOW_WIDTH, HD_WIDTH, etc.
+         int windowHeight = 768;    // Should suggest LARGE_WINDOW_HEIGHT, HD_HEIGHT, etc.
+     }
++    
++    // NEW: Cryptography constants test cases
++    
++    public void connectWithRetry() {
++        int maxRetries = 3;                    // Should suggest MAX_RETRIES, RETRY_LIMIT
++        int pollAttempts = 5;                  // Should suggest MAX_POLL_ATTEMPTS, POLL_RETRY_LIMIT
++    }
++          // Should suggest NEWLINE_CHAR, LINE_FEED
++    
++    // NEW: Bit flag test cases
++    public void checkFlags() {
++        int flag1 = 1;                         // Bit flag for enabled
++        int flag2 = 2;                         // Bit flag for active
++        int flag4 = 4;                         // Bit flag for visible
++        int combined = flag1 | flag2;          // Bitwise OR
++    }
++    
++    // NEW: Configuration threshold test cases
++    static final int THRESHOLD = 100;          // Should suggest FULL_PERCENT, MAX_PERCENTAGE
++    static final int HALF = 50;  
++    int a = 500;   
++    
++    if(a<8080){};
++        // Should suggest HALF_PERCENT, MID_THRESHOLD
++
++        b = a * 1.18;
++    
+ } 
+\ No newline at end of file
+diff --git a/test/HelloJNI.java b/test/HelloJNI.java
+index cc8be6b..64b405b 100644
+--- a/test/HelloJNI.java
++++ b/test/HelloJNI.java
+@@ -11,6 +11,9 @@ public class HelloJNI {
+     
+     // Native method with different signature
+     public native String getMessage(String name);
++
++
++
+     
+     public static void main(String[] args) {
+         HelloJNI hello = new HelloJNI();
+@@ -19,5 +22,7 @@ public class HelloJNI {
+         String message = hello.getMessage("World");
+         System.out.println("Result: " + result);
+         System.out.println("Message: " + message);
++
++        if(result<8080){};
+     }
+ } 
+\ No newline at end of file

@@ -20,9 +20,9 @@ export interface ConstantInfo {
 }
 
 export interface ConstantContext {
-    type: 'variable_assignment' | 'function_argument' | 'calculation' | 'comparison' | 
-          'loop_condition' | 'array_index' | 'bitwise' | 'return_code' | 'time_calc' | 
-          'ui_dimension' | 'buffer_size' | 'unknown';
+    type: 'variable_assignment' | 'function_argument' | 'calculation' | 'comparison' |
+    'loop_condition' | 'array_index' | 'bitwise' | 'return_code' | 'time_calc' |
+    'ui_dimension' | 'buffer_size' | 'unknown';
     surroundingCode: string;
     variableName?: string;
     functionName?: string;
@@ -39,7 +39,7 @@ export class ConstantsAnalyzer {
 
     async analyzeWorkspace(workspaceFolder: vscode.WorkspaceFolder): Promise<ConstantInfo[]> {
         console.log('🔍 Analyzing constants in workspace...');
-        
+
         this.constants.clear();
 
         // Find Java files
@@ -68,17 +68,17 @@ export class ConstantsAnalyzer {
 
         // Regex for Java constants (static final)
         const constantRegex = /(?:public|private|protected)?\s*static\s+final\s+(\w+)\s+([A-Z_][A-Z0-9_]*)\s*=\s*([^;]+);/g;
-        
+
         let match;
         while ((match = constantRegex.exec(content)) !== null) {
             const type = match[1];
             const name = match[2];
             const value = match[3].trim();
-            
+
             const position = document.positionAt(match.index);
             const context = this.analyzeContext(content, match.index, lines, position.line);
             const suggestedNames = this.generateNameSuggestions(value, context);
-            
+
             const constantInfo: ConstantInfo = {
                 name,
                 value,
@@ -110,15 +110,15 @@ export class ConstantsAnalyzer {
         // Regex for #define macros
         const defineRegex = /#define\s+([A-Z_][A-Z0-9_]*)\s+(.+)/g;
         let match;
-        
+
         while ((match = defineRegex.exec(content)) !== null) {
             const name = match[1];
             const value = match[2].trim();
-            
+
             const position = document.positionAt(match.index);
             const context = this.analyzeContext(content, match.index, lines, position.line);
             const suggestedNames = this.generateNameSuggestions(value, context);
-            
+
             const constantInfo: ConstantInfo = {
                 name,
                 value,
@@ -143,11 +143,11 @@ export class ConstantsAnalyzer {
             const type = match[1];
             const name = match[2];
             const value = match[3].trim();
-            
+
             const position = document.positionAt(match.index);
             const context = this.analyzeContext(content, match.index, lines, position.line);
             const suggestedNames = this.generateNameSuggestions(value, context);
-            
+
             const constantInfo: ConstantInfo = {
                 name,
                 value,
@@ -171,11 +171,11 @@ export class ConstantsAnalyzer {
         const surroundingStart = Math.max(0, lineNumber - 2);
         const surroundingEnd = Math.min(lines.length - 1, lineNumber + 2);
         const surroundingCode = lines.slice(surroundingStart, surroundingEnd + 1).join('\n');
-        
+
         const currentLine = lines[lineNumber];
         const prevLine = lineNumber > 0 ? lines[lineNumber - 1] : '';
         const nextLine = lineNumber < lines.length - 1 ? lines[lineNumber + 1] : '';
-        
+
         // Analyze context type based on surrounding code
         let contextType: ConstantContext['type'] = 'unknown';
         let variableName: string | undefined;
@@ -239,7 +239,7 @@ export class ConstantsAnalyzer {
     }
 
 
-    
+
     private generateNameSuggestions(value: string, context: ConstantContext): { suggestions: string[]; confidence: number } {
         const suggestions: string[] = [];
         let confidence = 50; // Base confidence
@@ -299,14 +299,14 @@ export class ConstantsAnalyzer {
                 'magic_number',
                 (value, context) => {
                     const numValue = parseInt(value);
-                    return /^\d{2,}$/.test(value) && 
-                           !['10', '100', '1000', '3600', '365', '24', '60', '99', '50', '256', '512'].includes(value) &&
-                           !/^0+$/.test(value);
+                    return /^\d{2,}$/.test(value) &&
+                        !['10', '100', '1000', '3600', '365', '24', '60', '99', '50', '256', '512'].includes(value) &&
+                        !/^0+$/.test(value);
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common patterns for magic numbers
                     if (numValue >= 1000 && numValue <= 9999) {
                         suggestions.push('DEFAULT_TIMEOUT_MS', 'MAX_BUFFER_SIZE', 'DEFAULT_PORT');
@@ -315,7 +315,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue >= 10 && numValue <= 99) {
                         suggestions.push('MAX_ATTEMPTS', 'RETRY_COUNT', 'DEFAULT_COUNT');
                     }
-                    
+
                     // Context-specific suggestions
                     if (context.type === 'comparison') {
                         suggestions.push('THRESHOLD_VALUE', 'LIMIT_VALUE', 'MAX_VALUE');
@@ -324,7 +324,7 @@ export class ConstantsAnalyzer {
                     } else if (context.type === 'array_index') {
                         suggestions.push('ARRAY_SIZE', 'INDEX_LIMIT', 'MAX_INDEX');
                     }
-                    
+
                     return suggestions;
                 },
                 95
@@ -335,14 +335,14 @@ export class ConstantsAnalyzer {
                 'time_constants',
                 (value, context) => {
                     const timeKeywords = ['second', 'minute', 'hour', 'day', 'ms', 'time', 'delay', 'sleep', 'wait'];
-                    return timeKeywords.some(keyword => 
+                    return timeKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common time values
                     if (numValue === 1000) {
                         suggestions.push('MILLISECONDS_PER_SECOND', 'MS_PER_SECOND', 'DEFAULT_TIMEOUT_MS');
@@ -357,7 +357,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 30000) {
                         suggestions.push('LONG_TIMEOUT_MS', 'SESSION_TIMEOUT_MS', 'IDLE_TIMEOUT_MS');
                     }
-                    
+
                     return suggestions;
                 },
                 90
@@ -368,14 +368,14 @@ export class ConstantsAnalyzer {
                 'buffer_size',
                 (value, context) => {
                     const bufferKeywords = ['buffer', 'size', 'length', 'capacity', 'bytes', 'kb', 'mb'];
-                    return bufferKeywords.some(keyword => 
+                    return bufferKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common buffer sizes
                     if (numValue === 1024) {
                         suggestions.push('DEFAULT_BUFFER_SIZE', 'BUFFER_CAPACITY', 'READ_BUFFER_SIZE', 'KILOBYTE_SIZE');
@@ -388,7 +388,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 65536) {
                         suggestions.push('MAX_BUFFER_SIZE', 'LARGE_CHUNK_SIZE', 'SIXTY_FOUR_KILOBYTE_SIZE');
                     }
-                    
+
                     return suggestions;
                 },
                 85
@@ -399,14 +399,14 @@ export class ConstantsAnalyzer {
                 'network_constants',
                 (value, context) => {
                     const networkKeywords = ['port', 'connection', 'socket', 'http', 'tcp', 'udp', 'server', 'client'];
-                    return networkKeywords.some(keyword => 
+                    return networkKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common port numbers
                     if (numValue === 80) {
                         suggestions.push('HTTP_PORT', 'DEFAULT_HTTP_PORT', 'WEB_PORT');
@@ -423,12 +423,12 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 27017) {
                         suggestions.push('MONGO_PORT', 'MONGODB_PORT', 'NOSQL_PORT');
                     }
-                    
+
                     // Connection limits
                     if (numValue >= 100 && numValue <= 1000) {
                         suggestions.push('MAX_CONNECTIONS', 'CONNECTION_POOL_SIZE', 'DEFAULT_CONNECTION_LIMIT');
                     }
-                    
+
                     return suggestions;
                 },
                 88
@@ -439,14 +439,14 @@ export class ConstantsAnalyzer {
                 'ui_constants',
                 (value, context) => {
                     const uiKeywords = ['width', 'height', 'size', 'pixel', 'px', 'margin', 'padding', 'border', 'font'];
-                    return uiKeywords.some(keyword => 
+                    return uiKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common UI dimensions
                     if (numValue === 800) {
                         suggestions.push('DEFAULT_WINDOW_WIDTH', 'MIN_WINDOW_WIDTH', 'STANDARD_WIDTH');
@@ -461,7 +461,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 12) {
                         suggestions.push('SMALL_MARGIN', 'COMPACT_PADDING', 'MIN_BORDER_WIDTH');
                     }
-                    
+
                     return suggestions;
                 },
                 82
@@ -472,14 +472,14 @@ export class ConstantsAnalyzer {
                 'error_constants',
                 (value, context) => {
                     const errorKeywords = ['error', 'status', 'code', 'exception', 'fail', 'success', 'ok'];
-                    return errorKeywords.some(keyword => 
+                    return errorKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     // Common status codes
                     if (numValue === 0) {
                         suggestions.push('SUCCESS_CODE', 'OK_STATUS', 'NO_ERROR');
@@ -492,7 +492,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 500) {
                         suggestions.push('INTERNAL_ERROR', 'SERVER_ERROR', 'HTTP_500');
                     }
-                    
+
                     return suggestions;
                 },
                 85
@@ -503,14 +503,14 @@ export class ConstantsAnalyzer {
                 'math_constants',
                 (value, context) => {
                     const mathKeywords = ['pi', 'euler', 'sqrt', 'log', 'exp', 'sin', 'cos', 'tan'];
-                    return mathKeywords.some(keyword => 
+                    return mathKeywords.some(keyword =>
                         context.surroundingCode.toLowerCase().includes(keyword)
                     );
                 },
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseFloat(value);
-                    
+
                     if (Math.abs(numValue - Math.PI) < 0.01) {
                         suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
                     } else if (Math.abs(numValue - Math.E) < 0.01) {
@@ -520,10 +520,197 @@ export class ConstantsAnalyzer {
                     } else if (numValue === 3.14159) {
                         suggestions.push('PI_VALUE', 'MATH_PI', 'PI_CONSTANT');
                     }
-                    
+
                     return suggestions;
                 },
                 90
+            ),
+
+            // Cryptography and Security Constants - NEW
+            new NamingRule(
+                'crypto_constants',
+                (value, context) => {
+                    const cryptoKeywords = ['key', 'encrypt', 'decrypt', 'rsa', 'aes', 'ssl', 'tls', 'hash', 'cipher', 'crypto', 'secret', 'token'];
+                    const cryptoValues = [128, 192, 256, 512, 1024, 2048, 4096, 8192];
+                    const numValue = parseInt(value);
+                    return cryptoKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
+                        cryptoValues.includes(numValue);
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+
+                    if (numValue === 128) suggestions.push('AES_KEY_SIZE_128', 'KEY_LENGTH_128', 'HASH_SIZE_BITS');
+                    else if (numValue === 256) suggestions.push('AES_KEY_SIZE_256', 'SHA256_BITS', 'ENCRYPTION_KEY_SIZE');
+                    else if (numValue === 512) suggestions.push('SHA512_BITS', 'RSA_KEY_SIZE_512', 'HASH_LENGTH_BITS');
+                    else if (numValue === 1024) suggestions.push('RSA_KEY_SIZE_1024', 'KEY_SIZE_BITS', 'CRYPTO_BLOCK_SIZE');
+                    else if (numValue === 2048) suggestions.push('RSA_KEY_SIZE_2048', 'RECOMMENDED_KEY_SIZE', 'SECURE_KEY_BITS');
+                    else if (numValue === 4096) suggestions.push('RSA_KEY_SIZE_4096', 'HIGH_SECURITY_KEY_SIZE', 'MAX_KEY_SIZE');
+
+                    return suggestions;
+                },
+                88
+            ),
+
+            // Unix Permission Constants - NEW
+            new NamingRule(
+                'permission_constants',
+                (value, context) => {
+                    const permKeywords = ['chmod', 'permission', 'mode', 'access', 'umask', 'file', 'dir', 'folder'];
+                    const permValues = [400, 444, 600, 644, 700, 755, 777, 775, 664];
+                    const numValue = parseInt(value);
+                    return permKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
+                        permValues.includes(numValue);
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+
+                    if (numValue === 755) suggestions.push('DIR_PERMISSION_755', 'EXECUTABLE_PERMISSION', 'DEFAULT_DIR_MODE');
+                    else if (numValue === 644) suggestions.push('FILE_PERMISSION_644', 'READ_WRITE_PERMISSION', 'DEFAULT_FILE_MODE');
+                    else if (numValue === 777) suggestions.push('FULL_PERMISSION_777', 'ALL_ACCESS_PERMISSION', 'MAX_PERMISSION');
+                    else if (numValue === 700) suggestions.push('OWNER_ONLY_PERMISSION', 'PRIVATE_DIR_MODE', 'SECURE_PERMISSION');
+                    else if (numValue === 600) suggestions.push('PRIVATE_FILE_PERMISSION', 'OWNER_RW_ONLY', 'SECURE_FILE_MODE');
+                    else if (numValue === 444) suggestions.push('READ_ONLY_PERMISSION', 'READONLY_FILE_MODE', 'NO_WRITE_PERMISSION');
+
+                    return suggestions;
+                },
+                92
+            ),
+
+            // Retry and Polling Limits - NEW
+            new NamingRule(
+                'retry_constants',
+                (value, context) => {
+                    const retryKeywords = ['retry', 'retries', 'attempt', 'poll', 'max', 'limit', 'count', 'tries', 'repeat'];
+                    const numValue = parseInt(value);
+                    return retryKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) &&
+                        numValue >= 1 && numValue <= 20;
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    const lowerCode = context.surroundingCode.toLowerCase();
+
+                    if (lowerCode.includes('retry') || lowerCode.includes('retries')) {
+                        suggestions.push('MAX_RETRIES', 'RETRY_LIMIT', 'MAX_RETRY_COUNT');
+                    } else if (lowerCode.includes('poll')) {
+                        suggestions.push('MAX_POLL_ATTEMPTS', 'POLL_RETRY_LIMIT', 'POLLING_MAX_TRIES');
+                    } else if (lowerCode.includes('attempt')) {
+                        suggestions.push('MAX_ATTEMPTS', 'ATTEMPT_LIMIT', 'TRY_COUNT_MAX');
+                    } else {
+                        suggestions.push('MAX_ITERATIONS', 'LOOP_LIMIT', 'REPEAT_COUNT');
+                    }
+
+                    return suggestions;
+                },
+                85
+            ),
+
+            // Character and ASCII Constants - NEW
+            new NamingRule(
+                'character_constants',
+                (value, context) => {
+                    const charKeywords = ['char', 'ascii', 'character', 'byte', 'code', 'unicode'];
+                    const numValue = parseInt(value);
+                    const commonChars = [0, 9, 10, 13, 32, 48, 65, 97, 127, 255];
+                    return charKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
+                        (commonChars.includes(numValue) && context.type === 'comparison');
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+
+                    if (numValue === 0) suggestions.push('NULL_CHAR', 'NUL_BYTE', 'STRING_TERMINATOR');
+                    else if (numValue === 9) suggestions.push('TAB_CHAR', 'HORIZONTAL_TAB', 'TAB_ASCII');
+                    else if (numValue === 10) suggestions.push('NEWLINE_CHAR', 'LINE_FEED', 'LF_CHAR');
+                    else if (numValue === 13) suggestions.push('CARRIAGE_RETURN', 'CR_CHAR', 'RETURN_CHAR');
+                    else if (numValue === 32) suggestions.push('SPACE_CHAR', 'SPACE_ASCII', 'WHITESPACE_CHAR');
+                    else if (numValue === 48) suggestions.push('ZERO_CHAR', 'DIGIT_ZERO_ASCII', 'CHAR_0');
+                    else if (numValue === 65) suggestions.push('UPPERCASE_A', 'CHAR_A_ASCII', 'ALPHA_START');
+                    else if (numValue === 97) suggestions.push('LOWERCASE_A', 'CHAR_a_ASCII', 'LOWER_ALPHA_START');
+                    else if (numValue === 127) suggestions.push('DELETE_CHAR', 'DEL_ASCII', 'MAX_ASCII_CONTROL');
+                    else if (numValue === 255) suggestions.push('MAX_BYTE_VALUE', 'UCHAR_MAX', 'BYTE_MAX');
+
+                    return suggestions;
+                },
+                80
+            ),
+
+            // Memory and Data Structure Sizes - NEW
+            new NamingRule(
+                'memory_constants',
+                (value, context) => {
+                    const memKeywords = ['alloc', 'memory', 'heap', 'stack', 'cache', 'block', 'chunk', 'segment'];
+                    const numValue = parseInt(value);
+                    const powerOfTwo = numValue > 0 && (numValue & (numValue - 1)) === 0 && numValue >= 16;
+                    return memKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) || powerOfTwo;
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+
+                    if (numValue === 16) suggestions.push('ALIGNMENT_SIZE', 'CACHE_LINE_MIN', 'WORD_SIZE');
+                    else if (numValue === 32) suggestions.push('CACHE_LINE_SIZE', 'ALIGNMENT_32', 'STRUCT_PADDING');
+                    else if (numValue === 64) suggestions.push('CACHE_LINE_SIZE_64', 'BLOCK_SIZE_64', 'ALIGNMENT_64');
+                    else if (numValue === 128) suggestions.push('BLOCK_SIZE_128', 'CACHE_BLOCK_SIZE', 'MEMORY_ALIGNMENT');
+                    else if (numValue === 256) suggestions.push('PAGE_SIZE_256', 'ALLOCATION_BLOCK', 'CHUNK_SIZE_256');
+
+                    return suggestions;
+                },
+                82
+            ),
+
+            // Bit Flag Constants - NEW
+            new NamingRule(
+                'bitflag_constants',
+                (value, context) => {
+                    const bitwiseOps = ['&', '|', '^', '<<', '>>', '~'];
+                    const numValue = parseInt(value);
+                    const isPowerOfTwo = numValue > 0 && (numValue & (numValue - 1)) === 0;
+                    return bitwiseOps.some(op => context.surroundingCode.includes(op)) && isPowerOfTwo;
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    const bitPosition = Math.log2(numValue);
+
+                    suggestions.push(`FLAG_BIT_${bitPosition}`, `MASK_${numValue}`, `BIT_FLAG_${numValue}`);
+                    if (numValue === 1) suggestions.push('FLAG_ENABLED', 'FIRST_BIT', 'LSB_MASK');
+                    else if (numValue === 2) suggestions.push('FLAG_SECOND', 'SECOND_BIT', 'FLAG_ACTIVE');
+                    else if (numValue === 4) suggestions.push('FLAG_THIRD', 'THIRD_BIT', 'FLAG_VISIBLE');
+                    else if (numValue === 8) suggestions.push('FLAG_FOURTH', 'FOURTH_BIT', 'FLAG_SELECTED');
+
+                    return suggestions;
+                },
+                90
+            ),
+
+            // Configuration and Threshold Constants - NEW
+            new NamingRule(
+                'config_constants',
+                (value, context) => {
+                    const configKeywords = ['config', 'setting', 'threshold', 'limit', 'max', 'min', 'default', 'initial'];
+                    const numValue = parseInt(value);
+                    const roundNumbers = [10, 25, 50, 75, 100, 150, 200, 250, 500, 750, 1000];
+                    return configKeywords.some(kw => context.surroundingCode.toLowerCase().includes(kw)) ||
+                        roundNumbers.includes(numValue);
+                },
+                (value, context) => {
+                    const suggestions = [];
+                    const numValue = parseInt(value);
+                    const varHint = (context.variableName || '').toUpperCase();
+
+                    if (varHint) {
+                        suggestions.push(`${varHint}_THRESHOLD`, `DEFAULT_${varHint}`, `${varHint}_LIMIT`);
+                    }
+                    if (numValue === 50) suggestions.push('HALF_PERCENT', 'MID_THRESHOLD', 'DEFAULT_PERCENTAGE');
+                    else if (numValue === 100) suggestions.push('FULL_PERCENT', 'MAX_PERCENTAGE', 'HUNDRED_PERCENT');
+                    else if (numValue === 1000) suggestions.push('THOUSAND_VALUE', 'KILO_MULTIPLIER', 'DEFAULT_LARGE_LIMIT');
+
+                    return suggestions;
+                },
+                75
             ),
 
             // Default rule for numeric values
@@ -533,7 +720,7 @@ export class ConstantsAnalyzer {
                 (value, context) => {
                     const suggestions = [];
                     const numValue = parseInt(value);
-                    
+
                     if (numValue > 0 && numValue < 10) {
                         suggestions.push('MAX_RETRIES', 'RETRY_COUNT', 'MAX_ATTEMPTS', 'DEFAULT_COUNT');
                     } else if (numValue >= 10 && numValue < 100) {
@@ -543,7 +730,7 @@ export class ConstantsAnalyzer {
                     } else if (numValue >= 1000) {
                         suggestions.push('LARGE_SIZE', 'MAX_CAPACITY', 'UPPER_LIMIT', 'MAX_VALUE');
                     }
-                    
+
                     return suggestions;
                 },
                 40
@@ -570,13 +757,13 @@ export class ConstantsAnalyzer {
     private extractCppScope(content: string, index: number): 'public' | 'private' | 'global' {
         const beforeDeclaration = content.substring(0, index);
         const lines = beforeDeclaration.split('\n').reverse();
-        
+
         for (const line of lines) {
             if (line.includes('public:')) return 'public';
             if (line.includes('private:')) return 'private';
             if (line.includes('class ') || line.includes('struct ')) break;
         }
-        
+
         return 'global';
     }
 
@@ -600,9 +787,9 @@ export class ConstantsAnalyzer {
     }
 
 
-    
 
-    
+
+
 }
 
 class NamingRule {
@@ -611,7 +798,7 @@ class NamingRule {
         public matches: (value: string, context: ConstantContext) => boolean,
         public generateNames: (value: string, context: ConstantContext) => string[],
         public confidence: number
-    ) {}
+    ) { }
 }
 
 // Convert free-form text to SCREAMING_SNAKE_CASE constant style
@@ -625,61 +812,313 @@ function toConstCase(text: string): string {
 }
 
 /**
- * Scan a workspace for magic numbers.
- * A magic number is any integer or float literal (not 0/1/2/10/100/1000 etc) outside of obvious constant/define lines.
- * It populates the returned array with objects that follow the same shape as your normal constants, but with category: 'magic_number'.
+ * Scan workspace for magic numbers in:
+ * 1. Variable assignments: int ajinkya = 8080 → suggests AJINKYA_PORT, SERVER_PORT
+ * 2. Comparisons: if(a < 8080) → suggests SERVER_PORT for 8080
  */
 async function findMagicNumbersInWorkspace(): Promise<any[]> {
     const allMagicNumbers: any[] = [];
-    // Adjust the glob for your languages
-    const files = await vscode.workspace.findFiles('**/*.{cpp,c,h,hpp,java,cs,js,ts}');
+    const files = await vscode.workspace.findFiles('**/*.{cpp,c,h,hpp,java}');
+
     for (const file of files) {
         const doc = await vscode.workspace.openTextDocument(file);
         const lines = doc.getText().split('\n');
+
         for (let lineNumber = 0; lineNumber < lines.length; lineNumber++) {
             const line = lines[lineNumber];
-            // Skip comments and declarations
-            if (line.trim().startsWith('//') || line.trim().startsWith('*')) continue;
-            if (/(const|#define|final|constexpr|static const)\b/i.test(line)) continue;
+            const trimmedLine = line.trim();
 
-            // Ignore numbers inside strings (basic version)
-            let cleaned = line.replace(/(["'`]).*?\1/g, '');
+            // Skip comments
+            if (trimmedLine.startsWith('//') || trimmedLine.startsWith('*') || trimmedLine.startsWith('/*')) continue;
 
-            // INT magic numbers >= 2 digits, not obvious enums, not array init's like int arr[10]
-            for (const m of cleaned.matchAll(/\b-?\d{2,}\b/g)) {
-                const value = m[0];
-                if (/^0+$/.test(value)) continue; // all zeros
-                if (["10","100","1000","3600","365","24","60","99","50","256","512"].includes(value)) continue; // common
-                allMagicNumbers.push({
-                    name: `MAGIC_${value}`,
-                    value,
-                    type: /^\d+$/.test(value) ? 'int' : 'unknown',
-                    file: file.fsPath,
-                    line: lineNumber,
-                    column: m.index,
-                    language: guessLangFromExt(file.fsPath),
-                    category: 'magic_number',
-                    suggestedNames: [], // (optional: run suggestions here if you have it)
-                });
+            // Ignore numbers inside strings
+            let cleaned = line.replace(/([\"'`]).*?\1/g, '');
+
+            // === PATTERN 1: Variable assignments ===
+            // "type varName = number" or "varName = number"
+            const assignmentMatch = cleaned.match(/(?:(?:int|long|short|float|double|byte)\s+)?(\w+)\s*=\s*(\d+)/);
+
+            if (assignmentMatch) {
+                const varName = assignmentMatch[1];
+                const value = assignmentMatch[2];
+                const numValue = parseInt(value);
+
+                // Skip already well-named constants (ALL_CAPS)
+                if (!/^[A-Z_][A-Z0-9_]*$/.test(varName) && numValue > 1) {
+                    const suggestions = generateValueBasedSuggestions(varName, value, numValue);
+
+                    if (suggestions.length > 0) {
+                        allMagicNumbers.push({
+                            name: varName,
+                            value,
+                            type: 'int',
+                            file: file.fsPath,
+                            line: lineNumber,
+                            column: assignmentMatch.index || 0,
+                            language: guessLangFromExt(file.fsPath),
+                            category: 'magic_number',
+                            context: {
+                                type: 'variable_assignment',
+                                surroundingCode: cleaned,
+                                variableName: varName
+                            },
+                            suggestedNames: suggestions,
+                            confidence: 85,
+                            usageContext: `Variable "${varName}" = ${value}`
+                        });
+                    }
+                }
             }
-            // FLOATS: 1+ digits, dot, 1+ digits
-            for (const m of cleaned.matchAll(/\b-?\d+\.\d+\b/g)) {
-                const value = m[0];
-                allMagicNumbers.push({
-                    name: `MAGIC_${value.replace('.','_')}`,
-                    value,
-                    type: 'float',
-                    file: file.fsPath,
-                    line: lineNumber,
-                    column: m.index,
-                    language: guessLangFromExt(file.fsPath),
-                    category: 'magic_number',
-                    suggestedNames: [],
-                });
+
+            // === PATTERN 2: Comparisons in if/while/for ===
+            // if(a < 8080), while(x > 100), for(i = 0; i < 50; i++)
+            const isComparison = /\b(if|else\s*if|while|for)\s*\(/.test(cleaned);
+            if (isComparison) {
+                // Find numbers in comparison operators: < > <= >= == !=
+                const comparisonMatches = cleaned.matchAll(/(?:<=|>=|<|>|==|!=)\s*(\d+)/g);
+
+                for (const m of comparisonMatches) {
+                    const value = m[1];
+                    const numValue = parseInt(value);
+
+                    // Skip trivial values
+                    if (numValue <= 1) continue;
+                    if (['10', '100', '1000'].includes(value)) continue;
+
+                    // Generate suggestions based on value
+                    const suggestions = generateValueBasedSuggestions('MAGIC', value, numValue);
+
+                    if (suggestions.length > 0) {
+                        allMagicNumbers.push({
+                            name: `MagicNumber_${value}`,
+                            value,
+                            type: 'int',
+                            file: file.fsPath,
+                            line: lineNumber,
+                            column: m.index || 0,
+                            language: guessLangFromExt(file.fsPath),
+                            category: 'magic_number',
+                            context: {
+                                type: 'comparison',
+                                surroundingCode: cleaned
+                            },
+                            suggestedNames: suggestions,
+                            confidence: 80,
+                            usageContext: `Comparison with ${value}`
+                        });
+                    }
+                }
+            }
+
+            // === PATTERN 3: Arithmetic operations ===
+            // price * 1.15 → TAX_RATE_MULTIPLIER, amount / 100 → PERCENTAGE_DIVISOR
+            const arithmeticMatches = cleaned.matchAll(/(\w+)\s*([*\/+\-])\s*(\d+\.?\d*)/g);
+
+            for (const m of arithmeticMatches) {
+                const varName = m[1];
+                const operator = m[2];
+                const value = m[3];
+                const numValue = parseFloat(value);
+
+                // Skip trivial values and already processed assignments
+                if (numValue <= 1 && operator !== '*' && operator !== '/') continue;
+                if (/^[A-Z_][A-Z0-9_]*$/.test(varName)) continue; // Already a constant
+
+                // Generate arithmetic-context suggestions
+                const suggestions = generateArithmeticSuggestions(varName, value, numValue, operator);
+
+                if (suggestions.length > 0) {
+                    allMagicNumbers.push({
+                        name: `Magic_${value.replace('.', '_')}`,
+                        value,
+                        type: value.includes('.') ? 'float' : 'int',
+                        file: file.fsPath,
+                        line: lineNumber,
+                        column: m.index || 0,
+                        language: guessLangFromExt(file.fsPath),
+                        category: 'magic_number',
+                        context: {
+                            type: 'calculation',
+                            surroundingCode: cleaned,
+                            operation: operator
+                        },
+                        suggestedNames: suggestions,
+                        confidence: 82,
+                        usageContext: `${varName} ${operator} ${value}`
+                    });
+                }
             }
         }
     }
     return allMagicNumbers;
+}
+
+/**
+ * Generate naming suggestions based on the VALUE meaning.
+ * E.g., 8080 → port, 1024 → buffer size, 5000 → timeout
+ */
+function generateValueBasedSuggestions(varName: string, value: string, numValue: number): string[] {
+    const suggestions: string[] = [];
+    const upperVar = varName.toUpperCase();
+
+    // === NETWORK PORTS ===
+    if (numValue === 80) {
+        suggestions.push(`${upperVar}_HTTP_PORT`, 'HTTP_PORT', 'DEFAULT_PORT');
+    } else if (numValue === 443) {
+        suggestions.push(`${upperVar}_HTTPS_PORT`, 'HTTPS_PORT', 'SECURE_PORT');
+    } else if (numValue === 8080) {
+        suggestions.push(`${upperVar}_PORT`, 'SERVER_PORT', 'ALT_HTTP_PORT', 'DEV_PORT');
+    } else if (numValue === 3000) {
+        suggestions.push(`${upperVar}_PORT`, 'DEV_SERVER_PORT', 'NODE_PORT');
+    } else if (numValue === 5432) {
+        suggestions.push(`${upperVar}_PORT`, 'POSTGRES_PORT', 'DB_PORT');
+    } else if (numValue === 3306) {
+        suggestions.push(`${upperVar}_PORT`, 'MYSQL_PORT', 'DATABASE_PORT');
+    } else if (numValue === 27017) {
+        suggestions.push(`${upperVar}_PORT`, 'MONGO_PORT', 'NOSQL_PORT');
+    } else if (numValue === 6379) {
+        suggestions.push(`${upperVar}_PORT`, 'REDIS_PORT', 'CACHE_PORT');
+    }
+
+    // === BUFFER/MEMORY SIZES ===
+    else if (numValue === 1024) {
+        suggestions.push(`${upperVar}_SIZE`, 'BUFFER_SIZE', 'KILOBYTE', 'DEFAULT_BUFFER');
+    } else if (numValue === 2048) {
+        suggestions.push(`${upperVar}_SIZE`, 'LARGE_BUFFER_SIZE', 'RSA_KEY_SIZE');
+    } else if (numValue === 4096) {
+        suggestions.push(`${upperVar}_SIZE`, 'PAGE_SIZE', 'MAX_BUFFER_SIZE');
+    } else if (numValue === 8192) {
+        suggestions.push(`${upperVar}_SIZE`, 'LARGE_PAGE_SIZE', 'EXTENDED_BUFFER');
+    } else if (numValue === 256 || numValue === 512) {
+        suggestions.push(`${upperVar}_SIZE`, 'BLOCK_SIZE', 'CHUNK_SIZE');
+    }
+
+    // === TIMEOUTS (common milliseconds) ===
+    else if (numValue === 5000) {
+        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'DEFAULT_TIMEOUT_MS', 'CONNECTION_TIMEOUT');
+    } else if (numValue === 10000) {
+        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'LONG_TIMEOUT_MS', 'READ_TIMEOUT');
+    } else if (numValue === 30000) {
+        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'SESSION_TIMEOUT_MS', 'IDLE_TIMEOUT');
+    } else if (numValue === 60000) {
+        suggestions.push(`${upperVar}_TIMEOUT_MS`, 'ONE_MINUTE_MS', 'MAX_TIMEOUT');
+    } else if (numValue === 1000) {
+        suggestions.push(`${upperVar}_MS`, 'ONE_SECOND_MS', 'MILLISECONDS_PER_SECOND');
+    }
+
+    // === TIME CONSTANTS ===
+    else if (numValue === 60) {
+        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_MINUTE', 'ONE_MINUTE');
+    } else if (numValue === 3600) {
+        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_HOUR', 'ONE_HOUR');
+    } else if (numValue === 86400) {
+        suggestions.push(`${upperVar}_SECONDS`, 'SECONDS_PER_DAY', 'ONE_DAY');
+    } else if (numValue === 24) {
+        suggestions.push(`${upperVar}_HOURS`, 'HOURS_PER_DAY', 'MAX_HOURS');
+    } else if (numValue === 365) {
+        suggestions.push(`${upperVar}_DAYS`, 'DAYS_PER_YEAR', 'MAX_DAYS');
+    }
+
+    // === HTTP STATUS CODES ===
+    else if (numValue === 200) {
+        suggestions.push(`${upperVar}_STATUS`, 'HTTP_OK', 'SUCCESS_STATUS');
+    } else if (numValue === 404) {
+        suggestions.push(`${upperVar}_ERROR`, 'NOT_FOUND_ERROR', 'HTTP_NOT_FOUND');
+    } else if (numValue === 500) {
+        suggestions.push(`${upperVar}_ERROR`, 'SERVER_ERROR', 'HTTP_SERVER_ERROR');
+    } else if (numValue === 401) {
+        suggestions.push(`${upperVar}_ERROR`, 'UNAUTHORIZED_ERROR', 'HTTP_UNAUTHORIZED');
+    } else if (numValue === 403) {
+        suggestions.push(`${upperVar}_ERROR`, 'FORBIDDEN_ERROR', 'HTTP_FORBIDDEN');
+    }
+
+    // === RETRY/COUNT LIMITS (small numbers 2-10) ===
+    else if (numValue >= 2 && numValue <= 10) {
+        suggestions.push(`MAX_${upperVar}`, `${upperVar}_LIMIT`, `${upperVar}_COUNT`, 'MAX_RETRIES');
+    }
+
+    // === PERCENTAGES ===
+    else if (numValue === 50) {
+        suggestions.push(`${upperVar}_PERCENT`, 'HALF_PERCENT', 'MID_THRESHOLD');
+    } else if (numValue === 100) {
+        suggestions.push(`${upperVar}_PERCENT`, 'FULL_PERCENT', 'MAX_PERCENTAGE');
+    }
+
+    // === UNIX PERMISSIONS ===
+    else if (numValue === 755 || numValue === 644 || numValue === 777 || numValue === 700) {
+        suggestions.push(`${upperVar}_PERMISSION`, 'FILE_MODE', 'DIR_PERMISSION');
+    }
+
+    // === CRYPTO KEY SIZES ===
+    else if (numValue === 128 || numValue === 192) {
+        suggestions.push(`${upperVar}_KEY_SIZE`, 'AES_KEY_BITS', 'ENCRYPTION_BITS');
+    }
+
+    // === GENERIC VALUES ===
+    else if (numValue >= 100) {
+        suggestions.push(`${upperVar}_VALUE`, `${upperVar}_LIMIT`, `MAX_${upperVar}`);
+    }
+
+    // Remove duplicates and limit to 5
+    return [...new Set(suggestions)].slice(0, 5);
+}
+
+/**
+ * Generate suggestions for numbers in arithmetic operations.
+ * E.g., price * 1.15 → TAX_RATE_MULTIPLIER, amount / 100 → PERCENTAGE_DIVISOR
+ */
+function generateArithmeticSuggestions(varName: string, value: string, numValue: number, operator: string): string[] {
+    const suggestions: string[] = [];
+    const upperVar = varName.toUpperCase();
+    const isFloat = value.includes('.');
+
+    // === MULTIPLICATION CONTEXT ===
+    if (operator === '*') {
+        // Tax/fee rates (1.05 to 1.30)
+        if (numValue >= 1.01 && numValue <= 1.50) {
+            const percentage = Math.round((numValue - 1) * 100);
+            suggestions.push(`TAX_RATE_${percentage}_PERCENT`, 'TAX_RATE_MULTIPLIER', 'FEE_MULTIPLIER');
+            if (percentage === 15) suggestions.push('GST_RATE', 'TAX_RATE');
+            if (percentage === 18) suggestions.push('GST_RATE_18', 'SERVICE_TAX');
+            if (percentage === 5 || percentage === 10) suggestions.push('DISCOUNT_RATE', 'MARKUP_RATE');
+        }
+        // Discount multipliers (0.5 to 0.99)
+        else if (numValue >= 0.5 && numValue < 1) {
+            const discount = Math.round((1 - numValue) * 100);
+            suggestions.push(`DISCOUNT_${discount}_PERCENT`, 'DISCOUNT_MULTIPLIER', 'REDUCTION_FACTOR');
+        }
+        // Round number multipliers
+        else if (numValue === 2) suggestions.push('DOUBLE_MULTIPLIER', 'TIMES_TWO', 'DOUBLING_FACTOR');
+        else if (numValue === 10) suggestions.push('TIMES_TEN', 'DECIMAL_SHIFT', 'ORDER_MAGNITUDE');
+        else if (numValue === 100) suggestions.push('PERCENTAGE_BASE', 'CENTS_TO_DOLLAR', 'HUNDRED_MULTIPLIER');
+        else if (numValue === 1000) suggestions.push('KILO_MULTIPLIER', 'THOUSAND_FACTOR', 'MS_TO_SECONDS');
+    }
+
+    // === DIVISION CONTEXT ===
+    else if (operator === '/') {
+        if (numValue === 100) suggestions.push('PERCENTAGE_DIVISOR', 'TO_PERCENTAGE', 'HUNDRED_DIVISOR');
+        else if (numValue === 1000) suggestions.push('TO_KILO', 'THOUSAND_DIVISOR', 'SECONDS_TO_MS');
+        else if (numValue === 2) suggestions.push('HALF_DIVISOR', 'SPLIT_FACTOR', 'BISECT_DIVISOR');
+        else if (numValue === 60) suggestions.push('SECONDS_PER_MINUTE', 'TO_MINUTES', 'TIME_DIVISOR');
+        else if (numValue === 24) suggestions.push('HOURS_PER_DAY', 'TO_DAYS', 'DAY_DIVISOR');
+    }
+
+    // === ADDITION/SUBTRACTION CONTEXT ===
+    else if (operator === '+' || operator === '-') {
+        if (numValue === 1) suggestions.push('INCREMENT_VALUE', 'OFFSET_ONE', 'UNIT_ADJUSTMENT');
+        else if (numValue >= 2 && numValue <= 10) suggestions.push(`${upperVar}_OFFSET`, 'ADJUSTMENT_VALUE', 'MARGIN_VALUE');
+    }
+
+    // === GENERIC ARITHMETIC ===
+    if (suggestions.length === 0 && numValue > 1) {
+        if (isFloat) {
+            suggestions.push(`${upperVar}_FACTOR`, 'CONVERSION_RATE', 'MULTIPLIER_VALUE');
+        } else {
+            suggestions.push(`${upperVar}_CONSTANT`, 'ARITHMETIC_VALUE', 'CALCULATION_FACTOR');
+        }
+    }
+
+    return [...new Set(suggestions)].slice(0, 5);
 }
 
 function guessLangFromExt(path: string): string {
