@@ -151,15 +151,16 @@ public class HelloJNI {
 ```
 
 
-# Running the Cross-Language Dependency Visualizer Extension
+# Running the Crosslink
 
 # Clone the repository
 ```terminal
 git clone https://github.com/yourusername/crosslink.git
 ```
 # Navigate to the directory
+```terminal
 cd crosslink
-
+```
 
 Launch Extension Host
 
