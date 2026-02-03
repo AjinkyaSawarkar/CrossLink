@@ -52,16 +52,16 @@ export class NativeMethodMover implements RefactoringOperation {
         }
 
         const workspaceEdit = new vscode.WorkspaceEdit();
-        
+
         // 1. Move Java method
         await this.moveJavaMethod(context, methodInfo, target, workspaceEdit);
-        
+
         // 2. Update JNI implementation
         await this.updateJniImplementation(context, methodInfo, target, workspaceEdit);
-        
+
         // 3. Update CMakeLists.txt if needed
         await this.updateCMakeFiles(context, methodInfo, target, workspaceEdit);
-        
+
         return workspaceEdit;
     }
 
@@ -71,16 +71,16 @@ export class NativeMethodMover implements RefactoringOperation {
             return { title: 'Move Native Method', changes: [] };
         }
 
-        const changes: Array<{file: string; oldContent: string; newContent: string; diff: string}> = [];
-        
+        const changes: Array<{ file: string; oldContent: string; newContent: string; diff: string }> = [];
+
         // Preview Java file changes
         const javaChanges = await this.previewJavaChanges(context, methodInfo);
         changes.push(...javaChanges);
-        
+
         // Preview C++ file changes
         const cppChanges = await this.previewCppChanges(context, methodInfo);
         changes.push(...cppChanges);
-        
+
         return {
             title: `Move Native Method: ${methodInfo.methodName}`,
             changes
@@ -198,12 +198,12 @@ export class NativeMethodMover implements RefactoringOperation {
 
         // Step 1: Scan available packages in the open folder
         const packages = await this.scanPackages(workspaceFolder.uri.fsPath);
-        
+
         // Step 2: Prepare QuickPick items for packages
         const quickPickItems: vscode.QuickPickItem[] = [
             { label: '$(folder-opened) Browse for target file...', description: 'Select from filesystem', alwaysShow: true }
         ];
-        
+
         packages.forEach(pkg => {
             quickPickItems.push({
                 label: pkg.packageName,
@@ -238,21 +238,21 @@ export class NativeMethodMover implements RefactoringOperation {
 
             const selectedFile = fileUris[0].fsPath;
             const { packageName, className } = this.extractPackageAndClassFromFile(selectedFile, workspaceFolder.uri.fsPath);
-            
+
             return { packageName, className, filePath: selectedFile };
         } else {
             // Package selected - now show existing classes/files in that package
             const packagePath = path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'java', selectedPackage.label.replace(/\./g, path.sep));
-            
+
             const classItems: vscode.QuickPickItem[] = [
                 { label: '$(new-file) Create New Class...', description: 'Create a new class in this package', alwaysShow: true }
             ];
-            
+
             // Scan for existing .java files in the package directory
             try {
                 const files = await fs.readdir(packagePath);
                 const javaFiles = files.filter(file => file.endsWith('.java'));
-                
+
                 javaFiles.forEach(file => {
                     const className = file.replace('.java', '');
                     classItems.push({
@@ -301,12 +301,12 @@ export class NativeMethodMover implements RefactoringOperation {
     }
 
     // NEW: Scan packages in the open folder
-    private async scanPackages(workspacePath: string): Promise<Array<{packageName: string; path: string; classCount: number}>> {
-        const packages: Array<{packageName: string; path: string; classCount: number}> = [];
-        
+    private async scanPackages(workspacePath: string): Promise<Array<{ packageName: string; path: string; classCount: number }>> {
+        const packages: Array<{ packageName: string; path: string; classCount: number }> = [];
+
         // Assume standard Java source structure: src/main/java
         const javaSrcPath = path.join(workspacePath, 'src', 'main', 'java');
-        
+
         try {
             await fs.access(javaSrcPath); // Check if path exists
         } catch {
@@ -319,7 +319,7 @@ export class NativeMethodMover implements RefactoringOperation {
             let classCount = 0;
             try {
                 const entries = await fs.readdir(currentPath, { withFileTypes: true });
-                
+
                 for (const entry of entries) {
                     const entryPath = path.join(currentPath, entry.name);
                     if (entry.isDirectory()) {
@@ -345,23 +345,23 @@ export class NativeMethodMover implements RefactoringOperation {
         };
 
         await scanDir(javaSrcPath, '');
-        
+
         // Sort by package name
         packages.sort((a, b) => a.packageName.localeCompare(b.packageName));
-        
+
         return packages;
     }
 
     // NEW: Extract package and class from file path (relative to workspace)
-    private extractPackageAndClassFromFile(filePath: string, workspacePath: string): {packageName: string; className: string} {
+    private extractPackageAndClassFromFile(filePath: string, workspacePath: string): { packageName: string; className: string } {
         const relativePath = path.relative(workspacePath, filePath);
         const className = path.basename(relativePath, '.java');
         const dirPath = path.dirname(relativePath);
-        
+
         // Derive package from directory structure (assuming src/main/java root)
         const packageParts = dirPath.split(path.sep).filter(part => part && !['src', 'main', 'java'].includes(part));
         const packageName = packageParts.join('.');
-        
+
         return { packageName, className };
     }
 
@@ -374,21 +374,21 @@ export class NativeMethodMover implements RefactoringOperation {
     ): Promise<void> {
         const document = context.document;
         const position = context.selection.active;
-        
+
         // Find the complete method declaration
         const methodRange = await this.findMethodRange(document, position);
         if (!methodRange) {
             return;
         }
-        
+
         const methodText = document.getText(methodRange);
-        
+
         // Remove from current class
         workspaceEdit.delete(document.uri, methodRange);
-        
+
         // Find or create target class file
         const targetClassFile = await this.findOrCreateTargetClass(target, workspaceEdit);
-        
+
         // Add to target class
         await this.addMethodToTargetClass(targetClassFile, methodText, workspaceEdit);
     }
@@ -401,28 +401,28 @@ export class NativeMethodMover implements RefactoringOperation {
     ): Promise<void> {
         // Find corresponding C/C++ source and header files
         const cppFiles = await this.findCppFiles(context.workspaceFolder);
-        
+
         for (const cppFile of cppFiles) {
             const document = await vscode.workspace.openTextDocument(cppFile);
             const content = document.getText();
-            
+
             // Find JNI function implementation
             const oldJniName = this.generateJniSignature(
                 methodInfo.packageName,
                 methodInfo.className,
                 methodInfo.methodName
             );
-            
+
             const newJniName = this.generateJniSignature(
                 target.packageName,
                 target.className,
                 methodInfo.methodName
             );
-            
+
             // Replace JNI function signatures (Java_qualifiedName_method) across impl and headers
             const escapedOld = oldJniName.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
             const updatedContent = content.replace(new RegExp(`Java_${escapedOld}`, 'g'), `Java_${newJniName}`);
-            
+
             if (updatedContent !== content) {
                 const fullRange = new vscode.Range(
                     document.positionAt(0),
@@ -440,11 +440,11 @@ export class NativeMethodMover implements RefactoringOperation {
         workspaceEdit: vscode.WorkspaceEdit
     ): Promise<void> {
         const cmakeFiles = await vscode.workspace.findFiles('**/CMakeLists.txt');
-        
+
         for (const cmakeFile of cmakeFiles) {
             const document = await vscode.workspace.openTextDocument(cmakeFile);
             const content = document.getText();
-            
+
             // Look for JNI-related configurations that might need updating
             // (This is a placeholder; customize based on your CMake setup)
             const jniConfigRegex = /find_package\s*\(\s*JNI\s+REQUIRED\s*\)/g;
@@ -458,7 +458,8 @@ export class NativeMethodMover implements RefactoringOperation {
 
     private extractClassName(document: vscode.TextDocument): string {
         const content = document.getText();
-        const classMatch = content.match(/class\s+(\w+)/);
+        // Match actual class declaration, not comments containing "class"
+        const classMatch = content.match(/(?:public|private|protected|abstract|final|\s)*\bclass\s+(\w+)/);
         return classMatch ? classMatch[1] : '';
     }
 
@@ -472,7 +473,7 @@ export class NativeMethodMover implements RefactoringOperation {
         if (!parametersStr.trim()) {
             return [];
         }
-        
+
         return parametersStr.split(',').map(param => param.trim());
     }
 
@@ -484,21 +485,21 @@ export class NativeMethodMover implements RefactoringOperation {
     private async findMethodRange(document: vscode.TextDocument, position: vscode.Position): Promise<vscode.Range | null> {
         const text = document.getText();
         const lines = text.split('\n');
-        
+
         // Find method start and end
         let startLine = position.line;
         let endLine = position.line;
-        
+
         // Find method start (look for native keyword)
         while (startLine > 0 && !lines[startLine].includes('native')) {
             startLine--;
         }
-        
+
         // Find method end (look for semicolon)
         while (endLine < lines.length - 1 && !lines[endLine].includes(';')) {
             endLine++;
         }
-        
+
         return new vscode.Range(
             new vscode.Position(startLine, 0),
             new vscode.Position(endLine, lines[endLine].length)
@@ -530,7 +531,7 @@ export class NativeMethodMover implements RefactoringOperation {
         const classFileName = `${target.className}.java`;
         const newFilePath = path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'java', packagePath, classFileName);
         const newFileUri = vscode.Uri.file(newFilePath);
-        
+
         try {
             await fs.access(newFilePath);
             return newFileUri;
@@ -550,11 +551,11 @@ export class NativeMethodMover implements RefactoringOperation {
     ): Promise<void> {
         const document = await vscode.workspace.openTextDocument(targetFile);
         const content = document.getText();
-        
+
         // Find the class body end
         const classEndRegex = /}\s*$/;
         const match = classEndRegex.exec(content);
-        
+
         if (match) {
             const insertPosition = document.positionAt(match.index);
             workspaceEdit.insert(targetFile, insertPosition, `\n    ${methodText}\n`);
@@ -567,12 +568,12 @@ export class NativeMethodMover implements RefactoringOperation {
         return files;
     }
 
-    private async previewJavaChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{file: string; oldContent: string; newContent: string; diff: string}>> {
+    private async previewJavaChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{ file: string; oldContent: string; newContent: string; diff: string }>> {
         // Implementation for previewing Java changes (stub; expand as needed)
         return [];
     }
 
-    private async previewCppChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{file: string; oldContent: string; newContent: string; diff: string}>> {
+    private async previewCppChanges(context: RefactoringContext, methodInfo: NativeMethodInfo): Promise<Array<{ file: string; oldContent: string; newContent: string; diff: string }>> {
         // Implementation for previewing C++ changes (stub; expand as needed)
         return [];
     }

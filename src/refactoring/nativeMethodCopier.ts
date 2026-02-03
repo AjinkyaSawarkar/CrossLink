@@ -55,13 +55,13 @@ export class NativeMethodCopier implements RefactoringOperation {
         }
 
         const workspaceEdit = new vscode.WorkspaceEdit();
-        
+
         // 1. Copy Java method to target class
         await this.copyJavaMethod(context, methodInfo, target, workspaceEdit);
-        
+
         // 2. Create corresponding JNI C++ method
         await this.createJniImplementation(context, methodInfo, target, workspaceEdit);
-        
+
         return workspaceEdit;
     }
 
@@ -71,11 +71,11 @@ export class NativeMethodCopier implements RefactoringOperation {
             return { title: 'Copy Native Method', changes: [] };
         }
 
-        const changes: Array<{file: string; oldContent: string; newContent: string; diff: string}> = [];
-        
+        const changes: Array<{ file: string; oldContent: string; newContent: string; diff: string }> = [];
+
         // Preview would show the target Java file with the new method
         // and the target C++ file with the new JNI method
-        
+
         return {
             title: `Copy Native Method: ${methodInfo.methodName}`,
             changes
@@ -85,7 +85,7 @@ export class NativeMethodCopier implements RefactoringOperation {
     private async extractNativeMethodInfo(context: RefactoringContext): Promise<NativeMethodInfo | null> {
         const document = context.document;
         const position = context.selection.active;
-        
+
         // Find the method that contains the current position
         const methodRange = await this.findMethodRange(document, position);
         if (!methodRange) {
@@ -93,7 +93,7 @@ export class NativeMethodCopier implements RefactoringOperation {
         }
 
         const methodText = document.getText(methodRange);
-        
+
         // Parse native method signature
         // Allow flexible modifier order (e.g., 'native private', annotations, generics, arrays)
         const nativeMethodRegex = new RegExp(
@@ -112,7 +112,7 @@ export class NativeMethodCopier implements RefactoringOperation {
             'm'
         );
         let match = methodText.match(nativeMethodRegex);
-        
+
         // Fallback: search a nearby window around the cursor with a looser pattern if strict match fails
         if (!match) {
             const docText = document.getText();
@@ -153,21 +153,21 @@ export class NativeMethodCopier implements RefactoringOperation {
             }
             return null;
         }
-        
+
         const returnType = match[1];
         const methodName = match[2];
         const parametersStr = match[3];
-        
+
         // Extract class and package information
         const className = this.extractClassName(document);
         const packageName = this.extractPackageName(document);
-        
+
         // Parse parameters
         const parameters = this.parseParameters(parametersStr);
-        
+
         // Generate JNI signature
         const jniSignature = this.generateJniSignature(packageName, className, methodName);
-        
+
         return {
             methodName,
             className,
@@ -248,7 +248,8 @@ export class NativeMethodCopier implements RefactoringOperation {
 
     private extractClassName(document: vscode.TextDocument): string {
         const text = document.getText();
-        const classMatch = text.match(/class\s+(\w+)/);
+        // Match class declaration at start of line (prevents matching within comments)
+        const classMatch = text.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
         return classMatch ? classMatch[1] : 'UnknownClass';
     }
 
@@ -262,7 +263,7 @@ export class NativeMethodCopier implements RefactoringOperation {
         if (!parametersStr.trim()) {
             return [];
         }
-        
+
         return parametersStr.split(',').map(param => param.trim());
     }
 
@@ -284,7 +285,7 @@ export class NativeMethodCopier implements RefactoringOperation {
         try {
             const dirEntries = await fs.readdir(currentDir);
             javaFilesInDir = dirEntries.filter(f => f.endsWith('.java'))
-                                       .map(f => path.join(currentDir, f));
+                .map(f => path.join(currentDir, f));
         } catch (err) {
             console.warn('Unable to list current directory for QuickPick:', err);
         }
@@ -333,17 +334,18 @@ export class NativeMethodCopier implements RefactoringOperation {
         return { packageName, className, filePath: selectedFile };
     }
 
-    
-    private async extractPackageAndClassFromFile(filePath: string): Promise<{packageName: string, className: string}> {
+
+    private async extractPackageAndClassFromFile(filePath: string): Promise<{ packageName: string, className: string }> {
         try {
             const content = await fs.readFile(filePath, 'utf8');
-            
+
             const packageMatch = content.match(/package\s+([\w.]+);/);
             const packageName = packageMatch ? packageMatch[1] : '';
-            
-            const classMatch = content.match(/class\s+(\w+)/);
+
+            // Match class declaration at start of line (prevents matching within comments)
+            const classMatch = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
             const className = classMatch ? classMatch[1] : path.basename(filePath, '.java');
-            
+
             return { packageName, className };
         } catch (error) {
             return { packageName: '', className: path.basename(filePath, '.java') };
@@ -361,15 +363,15 @@ export class NativeMethodCopier implements RefactoringOperation {
         }
 
         const targetUri = vscode.Uri.file(target.filePath);
-        
+
         try {
             const targetDocument = await vscode.workspace.openTextDocument(targetUri);
             const targetContent = targetDocument.getText();
-            
+
             // Find a good place to insert the method (before the last closing brace)
             const lines = targetContent.split('\n');
             let insertLine = lines.length - 1;
-            
+
             // Find the last closing brace of the class
             for (let i = lines.length - 1; i >= 0; i--) {
                 if (lines[i].trim() === '}') {
@@ -377,13 +379,13 @@ export class NativeMethodCopier implements RefactoringOperation {
                     break;
                 }
             }
-            
+
             // Create the method to insert
             const methodToInsert = `\n    // Copied from ${methodInfo.className}\n    ${methodInfo.fullMethodSignature}\n`;
-            
+
             const insertPosition = new vscode.Position(insertLine, 0);
             workspaceEdit.insert(targetUri, insertPosition, methodToInsert);
-            
+
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to copy method to target file: ${error}`);
         }
@@ -402,25 +404,25 @@ export class NativeMethodCopier implements RefactoringOperation {
         }
 
         const cppUri = vscode.Uri.file(cppFilePath);
-        
+
         // Generate JNI method signature for target class
         const targetJniSignature = this.generateJniSignature(target.packageName, target.className, methodInfo.methodName);
-        
+
         // Create JNI method implementation
         const jniMethod = this.generateJniMethodImplementation(targetJniSignature, methodInfo);
-        
+
         try {
             // Check if file exists
             let insertPosition: vscode.Position;
-            
+
             try {
                 const cppDocument = await vscode.workspace.openTextDocument(cppUri);
                 const cppContent = cppDocument.getText();
-                
+
                 // Insert at the end of the file
                 const lines = cppContent.split('\n');
                 insertPosition = new vscode.Position(lines.length, 0);
-                
+
                 workspaceEdit.insert(cppUri, insertPosition, `\n${jniMethod}\n`);
             } catch (error) {
                 // File doesn't exist, create it
@@ -428,7 +430,7 @@ export class NativeMethodCopier implements RefactoringOperation {
                 workspaceEdit.createFile(cppUri, { overwrite: false });
                 workspaceEdit.insert(cppUri, new vscode.Position(0, 0), fileContent);
             }
-            
+
         } catch (error) {
             vscode.window.showErrorMessage(`Failed to create JNI implementation: ${error}`);
         }
@@ -459,14 +461,14 @@ export class NativeMethodCopier implements RefactoringOperation {
             `${target.className.toLowerCase()}.cpp`,
             `${target.className}.cpp`
         ];
-        
+
         const possiblePaths = [
             path.join(workspaceFolder.uri.fsPath, 'src', 'main', 'cpp'),
             path.join(workspaceFolder.uri.fsPath, 'cpp'),
             path.join(workspaceFolder.uri.fsPath, 'native'),
             path.join(workspaceFolder.uri.fsPath, 'jni')
         ];
-        
+
         // Check if any existing file exists
         for (const basePath of possiblePaths) {
             for (const fileName of possibleNames) {
@@ -479,11 +481,11 @@ export class NativeMethodCopier implements RefactoringOperation {
                 }
             }
         }
-        
+
         // No existing file found, create new one
         const defaultPath = possiblePaths[0]; // Use first path as default
         const defaultFileName = possibleNames[0]; // Use first name as default
-        
+
         try {
             await fs.mkdir(defaultPath, { recursive: true });
             return path.join(defaultPath, defaultFileName);
@@ -500,10 +502,10 @@ export class NativeMethodCopier implements RefactoringOperation {
             const [type] = param.trim().split(/\s+/);
             return this.javaToJniType(type);
         });
-        
+
         // Generate parameter list
         const paramList = ['JNIEnv *env', 'jobject thiz', ...jniParams.map((type, index) => `${type} param${index}`)].join(', ');
-        
+
         return `
 // JNI implementation for ${methodInfo.methodName}
 JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
@@ -559,7 +561,7 @@ JNIEXPORT ${jniReturnType} JNICALL ${jniSignature}(${paramList}) {
         if (jniReturnType === 'void') {
             return '';
         }
-        
+
         const defaultValues: { [key: string]: string } = {
             'jboolean': 'return JNI_FALSE;',
             'jbyte': 'return 0;',
