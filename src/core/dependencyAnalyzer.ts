@@ -84,38 +84,38 @@ export class DependencyAnalyzer {
     }
 
     private async findJavaProjects(workspacePath: string): Promise<string[]> {
-        const projects: string[] = [];
-        const glob = require('glob');
+    const projects: string[] = [];
+    const glob = require('glob');
 
-        // Find Maven projects
-        const pomFiles = glob.sync('**/pom.xml', { cwd: workspacePath });
-        projects.push(...pomFiles.map((f: string) => path.join(workspacePath, f)));
+    // Find Maven projects
+    const pomFiles = glob.sync('**/pom.xml', { cwd: workspacePath });
+    projects.push(...pomFiles.map((f: string) => path.join(workspacePath, f)));
 
-        // Find Gradle projects
-        const gradleFiles = glob.sync('**/build.gradle*', { cwd: workspacePath });
-        projects.push(...gradleFiles.map((f: string) => path.join(workspacePath, f)));
+    // Find Gradle projects
+    const gradleFiles = glob.sync('**/build.gradle*', { cwd: workspacePath });
+    projects.push(...gradleFiles.map((f: string) => path.join(workspacePath, f)));
 
-        return projects;
-    }
+    return projects;
+}
 
-    private async findCppProjects(workspacePath: string): Promise<string[]> {
-        const projects: string[] = [];
-        const glob = require('glob');
+private async findCppProjects(workspacePath: string): Promise<string[]> {
+    const projects: string[] = [];
+    const glob = require('glob');
 
-        // Find CMake projects
-        const cmakeFiles = glob.sync('**/CMakeLists.txt', { cwd: workspacePath });
-        projects.push(...cmakeFiles.map((f: string) => path.join(workspacePath, f)));
+    // Find CMake projects
+    const cmakeFiles = glob.sync('**/CMakeLists.txt', { cwd: workspacePath });
+    projects.push(...cmakeFiles.map((f: string) => path.join(workspacePath, f)));
 
-        // Find Conan projects
-        const conanFiles = glob.sync('**/conanfile.*', { cwd: workspacePath });
-        projects.push(...conanFiles.map((f: string) => path.join(workspacePath, f)));
+    // Find Conan projects
+    const conanFiles = glob.sync('**/conanfile.*', { cwd: workspacePath });
+    projects.push(...conanFiles.map((f: string) => path.join(workspacePath, f)));
 
-        // Find vcpkg projects
-        const vcpkgFiles = glob.sync('**/vcpkg.json', { cwd: workspacePath });
-        projects.push(...vcpkgFiles.map((f: string) => path.join(workspacePath, f)));
+    // Find vcpkg projects
+    const vcpkgFiles = glob.sync('**/vcpkg.json', { cwd: workspacePath });
+    projects.push(...vcpkgFiles.map((f: string) => path.join(workspacePath, f)));
 
-        return projects;
-    }
+    return projects;
+}
 
     // private async findCppProjects(workspacePath: string): Promise<string[]> {
     //     const projects: string[] = [];
@@ -140,7 +140,7 @@ export class DependencyAnalyzer {
         try {
             const dependencies = await this.javaParser.parseDependencies(buildFile);
             const buildSystem = buildFile.includes('pom.xml') ? 'maven' : 'gradle';
-
+            
             return {
                 type: 'java',
                 buildSystem: buildSystem as 'maven' | 'gradle',
@@ -157,13 +157,13 @@ export class DependencyAnalyzer {
         try {
             const dependencies = await this.cppParser.parseDependencies(buildFile);
             let buildSystem: 'cmake' | 'conan' | 'vcpkg' = 'cmake';
-
+            
             if (buildFile.includes('conanfile')) {
                 buildSystem = 'conan';
             } else if (buildFile.includes('vcpkg.json')) {
                 buildSystem = 'vcpkg';
             }
-
+            
             return {
                 type: 'cpp',
                 buildSystem,
@@ -180,16 +180,16 @@ export class DependencyAnalyzer {
         for (const project of this.projects) {
             // Check for version conflicts
             const conflicts = this.conflictDetector.detectConflicts(project.dependencies);
-
+            
             // Check for missing libraries
             const missingLibs = await this.checkMissingLibraries(project);
-
+            
             // Check platform compatibility
             const platformIssues = this.platformChecker.checkCompatibility(project.dependencies);
-
+            
             // Update dependencies with issues
             this.updateDependenciesWithIssues(project, conflicts, missingLibs, platformIssues);
-
+            
             // Create diagnostics
             this.createDiagnostics(project, conflicts, missingLibs, platformIssues);
         }
@@ -197,14 +197,14 @@ export class DependencyAnalyzer {
 
     private async checkMissingLibraries(project: ProjectInfo): Promise<string[]> {
         const missing: string[] = [];
-
+        
         for (const dep of project.dependencies) {
             if (dep.path && !fs.existsSync(dep.path)) {
                 missing.push(dep.name);
                 dep.missing = true;
             }
         }
-
+        
         return missing;
     }
 
@@ -234,7 +234,7 @@ export class DependencyAnalyzer {
         platformIssues: string[]
     ): void {
         const uri = vscode.Uri.file(project.buildFile);
-
+        
         // Add conflict diagnostics
         conflicts.forEach((versions, libName) => {
             const diagnostic = new vscode.Diagnostic(
@@ -244,7 +244,7 @@ export class DependencyAnalyzer {
             );
             this.diagnostics.push(diagnostic);
         });
-
+        
         // Add missing library diagnostics
         missingLibs.forEach(libName => {
             const diagnostic = new vscode.Diagnostic(
@@ -254,7 +254,7 @@ export class DependencyAnalyzer {
             );
             this.diagnostics.push(diagnostic);
         });
-
+        
         // Add platform issue diagnostics
         platformIssues.forEach(libName => {
             const diagnostic = new vscode.Diagnostic(
@@ -276,7 +276,7 @@ export class DependencyAnalyzer {
 
 
 
-    // Make sure this method exists and returns FileConnection[]
+     // Make sure this method exists and returns FileConnection[]
     async getFileConnections(): Promise<FileConnection[]> {
         const connections: FileConnection[] = [];
 
@@ -358,7 +358,7 @@ export class DependencyAnalyzer {
                 packageName: this.extractPackageName(document)
             });
         }
-
+        
         // Fallback: robust global regex
         if (methods.length === 0) {
             const regex = /^(?:\s*@[\w.]+(?:\([^)]*\))?\s*)*(?:\s*(?:public|private|protected|static|final|abstract|strictfp|synchronized|native)\s+)+\s*(?:<[^>]+>\s*)?([A-Za-z_$][\w\[\]<>.?$]*)\s+([A-Za-z_$]\w*)\s*\([^;{)]*\)\s*;/gm;

@@ -1,7 +1,22 @@
 #include <iostream>
 
 // Magic numbers that should get suggestions
- // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
+#define MAGIC_42 42  // Should suggest MAX_RETRIES, RETRY_COUNT, etc.
+#define MAGIC_1024 1024  // Should suggest DEFAULT_BUFFER_SIZE, BUFFER_CAPACITY, etc.
+#define MAGIC_8080 8080  // Should suggest ALTERNATIVE_HTTP_PORT, DEV_PORT, etc.
+#define MAGIC_5000 5000  // Should suggest DEFAULT_TIMEOUT_MS, CONNECTION_TIMEOUT_MS, etc.
+
+// Time-related constants
+#define MAGIC_1000 1000  // Should suggest MILLISECONDS_PER_SECOND, MS_PER_SECOND, etc.
+#define MAGIC_3600 3600  // Should suggest SECONDS_PER_HOUR, HOUR_IN_SECONDS, etc.
+
+// UI-related constants
+#define MAGIC_800 800  // Should suggest DEFAULT_WINDOW_WIDTH, MIN_WINDOW_WIDTH, etc.
+#define MAGIC_600 600  // Should suggest DEFAULT_WINDOW_HEIGHT, MIN_WINDOW_HEIGHT, etc.
+
+// Error codes
+#define MAGIC_404 404  // Should suggest NOT_FOUND_ERROR, RESOURCE_NOT_FOUND, etc.
+#define MAGIC_500 500  // Should suggest INTERNAL_ERROR, SERVER_ERROR, etc.
 
 // Well-named constants (should not get suggestions)
 const int MAX_CONNECTIONS = 100;
@@ -32,23 +47,4 @@ public:
         double pi = 3.14159;       // Should suggest PI_VALUE, MATH_PI, etc.
         double e = 2.718;          // Should suggest EULER_NUMBER, MATH_E, etc.
     }
-};
-
-
-// NEW: Retry limit test cases
-void connectWithRetry() {
-    int maxRetries = 3;           // Should suggest MAX_RETRIES, RETRY_LIMIT
-    int pollAttempts = 5;         // Should suggest MAX_POLL_ATTEMPTS, POLL_RETRY_LIMIT
-}
-
-     // Should suggest CARRIAGE_RETURN, CR_CHAR
-
-// NEW: Bit flag test cases
-void checkFlags() {
-    int flag1 = 1;                // Bit flag for enabled
-    int flag2 = 2;                // Bit flag for active  
-    int flag4 = 4;                // Bit flag for visible
-    int combined = flag1 | flag2; // Bitwise OR
-}
-
-       // Should suggest HALF_PERCENT, MID_THRESHOLD 
+}; 

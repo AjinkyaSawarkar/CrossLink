@@ -4,11 +4,10 @@ This demo showcases the enhanced constant naming suggestions feature in the Cros
 
 ## 🚀 **Key Improvements**
 
-### **1. Focused Magic Number Detection** ✨ UPDATED
-- **Only detects numbers in comparisons**: `if (count < 5)` → suggests `MAX_COUNT`
-- **Only detects numbers in loops**: `for (i = 0; i < 10; i++)` → suggests `MAX_ITERATIONS`
-- **Context-aware suggestions**: Uses variable names to generate meaningful suggestions
-- **Examples**: `if (retries < 3)` → `MAX_RETRIES`, `while (age < 18)` → `MAX_AGE`
+### **1. Enhanced Naming Rules**
+- **Magic Number Detection**: Automatically identifies magic numbers with 95% confidence
+- **Context-Aware Suggestions**: Provides suggestions based on surrounding code context
+- **Domain-Specific Rules**: Specialized rules for time, network, UI, error codes, and mathematical constants
 
 ### **2. Direct Apply Buttons**
 - **🔥 One-Click Application**: Click on any constant with suggestions to apply the best one
@@ -71,10 +70,10 @@ double e = 2.718;          // → EULER_NUMBER, MATH_E
 2. Navigate to the "Constants" section
 3. View all constants with their suggestions
 
-### **2. Copy Suggestions** 📋 UPDATED
-- **📋 Click on any constant** with suggestions to copy the best one to clipboard
+### **2. Apply Suggestions**
+- **🔥 Click on any constant** with suggestions to apply the best one
 - **💡 Expand suggestions** to see all alternatives
-- **📋 Click individual suggestions** to copy specific ones to clipboard
+- **📋 Click individual suggestions** to apply specific ones
 
 ### **3. Confidence Levels**
 - **🔥 High Confidence (80%+)**: Strong suggestions based on clear patterns
@@ -92,19 +91,12 @@ double e = 2.718;          // → EULER_NUMBER, MATH_E
 ### **Suggestion Items**
 - **⭐ Primary suggestions**: Best recommendations
 - **💡 Alternative suggestions**: Other good options
-- **📋 Copy buttons**: Click to copy name to clipboard
+- **🔄 Apply buttons**: Direct application links
 
 ### **Hover Information**
 - **Rich tooltips** with detailed information
-- **Copy buttons** for each suggestion
+- **Apply buttons** for each suggestion
 - **Context information** about the constant
-
-## 📊 **Logging** ✨ NEW
-
-The extension logs all constant naming actions to the "Constants Naming Log" output channel:
-- **View logs**: Open Output panel (Ctrl+Shift+U) → Select "Constants Naming Log"
-- **Logged actions**: Copy to clipboard, Apply suggestion
-- **Format**: `[timestamp] ACTION: "value" → "suggestion" at file:line`
 
 ## 🔧 **Naming Rule Categories**
 
@@ -147,42 +139,6 @@ The extension logs all constant naming actions to the "Constants Naming Log" out
 ### **7. Mathematical Constants (90% confidence)**
 - **3.14159**: `PI_VALUE`, `MATH_PI`
 - **2.718**: `EULER_NUMBER`, `MATH_E`
-
-### **8. Cryptography Constants (88% confidence)** ✨ NEW
-- **128**: `AES_KEY_SIZE_128`, `KEY_LENGTH_128`
-- **256**: `AES_KEY_SIZE_256`, `SHA256_BITS`
-- **2048**: `RSA_KEY_SIZE_2048`, `RECOMMENDED_KEY_SIZE`
-- **4096**: `RSA_KEY_SIZE_4096`, `HIGH_SECURITY_KEY_SIZE`
-
-### **9. Unix Permission Constants (92% confidence)** ✨ NEW
-- **755**: `DIR_PERMISSION_755`, `EXECUTABLE_PERMISSION`
-- **644**: `FILE_PERMISSION_644`, `READ_WRITE_PERMISSION`
-- **700**: `OWNER_ONLY_PERMISSION`, `PRIVATE_DIR_MODE`
-- **777**: `FULL_PERMISSION_777`, `ALL_ACCESS_PERMISSION`
-
-### **10. Retry Limits (85% confidence)** ✨ NEW
-- Detects small integers (1-20) near retry/poll/attempt keywords
-- Suggestions: `MAX_RETRIES`, `RETRY_LIMIT`, `MAX_POLL_ATTEMPTS`
-
-### **11. Character Codes (80% confidence)** ✨ NEW
-- **32**: `SPACE_CHAR`, `SPACE_ASCII`
-- **10**: `NEWLINE_CHAR`, `LINE_FEED`
-- **13**: `CARRIAGE_RETURN`, `CR_CHAR`
-- **9**: `TAB_CHAR`, `HORIZONTAL_TAB`
-
-### **12. Bit Flag Constants (90% confidence)** ✨ NEW
-- Power-of-2 values near bitwise operations (&, |, ^, <<, >>)
-- Suggestions: `FLAG_BIT_N`, `MASK_N`, `BIT_FLAG_N`
-
-### **13. Memory/Alignment Constants (82% confidence)** ✨ NEW
-- **64**: `CACHE_LINE_SIZE_64`, `BLOCK_SIZE_64`
-- **128**: `BLOCK_SIZE_128`, `CACHE_BLOCK_SIZE`
-- **256**: `PAGE_SIZE_256`, `ALLOCATION_BLOCK`
-
-### **14. Configuration Thresholds (75% confidence)** ✨ NEW
-- **50**: `HALF_PERCENT`, `MID_THRESHOLD`
-- **100**: `FULL_PERCENT`, `MAX_PERCENTAGE`
-- **1000**: `THOUSAND_VALUE`, `KILO_MULTIPLIER`
 
 ## 🚀 **Benefits**
 

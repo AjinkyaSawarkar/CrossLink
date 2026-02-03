@@ -11,9 +11,6 @@ public class HelloJNI {
     
     // Native method with different signature
     public native String getMessage(String name);
-
-
-
     
     public static void main(String[] args) {
         HelloJNI hello = new HelloJNI();
@@ -22,7 +19,5 @@ public class HelloJNI {
         String message = hello.getMessage("World");
         System.out.println("Result: " + result);
         System.out.println("Message: " + message);
-
-        if(result<8080){};
     }
 } 

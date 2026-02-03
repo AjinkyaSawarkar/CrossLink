@@ -33,7 +33,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // FIX: Create instance of RefactoringProvider instead of using static methods
     const refactoringProvider = new RefactoringProvider();
-
+    
     // Register refactoring operations
     refactoringProvider.registerOperation(new RenamingProvider());
     refactoringProvider.registerOperation(new NativeMethodMover());
@@ -49,17 +49,17 @@ export function activate(context: vscode.ExtensionContext) {
     const libraryHighlighter = new LibraryHighlighter();
 
     // Register the unified dashboard provider
-    const dashboardProvider = new DashboardProvider(
-        context.extensionUri,
-        analyzer,
-        constantsAnalyzer,
-        refactoringProvider
-    );
+const dashboardProvider = new DashboardProvider(
+    context.extensionUri, 
+    analyzer, 
+    constantsAnalyzer, 
+    refactoringProvider
+);
 
-    context.subscriptions.push(
-        vscode.window.registerTreeDataProvider('dependencyTree', treeProvider),
-        vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider),
-    );
+context.subscriptions.push(
+    vscode.window.registerTreeDataProvider('dependencyTree', treeProvider),
+    vscode.window.registerWebviewViewProvider(DashboardProvider.viewType, dashboardProvider),
+);
 
     // Activate library highlighter
     libraryHighlighter.activate(context);
@@ -109,9 +109,9 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showInformationMessage(`JNI index rebuilt: ${stats.symbols} symbols across ${stats.files} hits`);
 
                 // Refresh views dependent on JNI connections
-                try { await enhancedFileConnectionListProvider.updateConnections(); } catch { }
-                try { statisticsProvider.updateStatistics(); } catch { }
-                try { await webviewProvider.updateWebview(); } catch { }
+                try { await enhancedFileConnectionListProvider.updateConnections(); } catch {}
+                try { statisticsProvider.updateStatistics(); } catch {}
+                try { await webviewProvider.updateWebview(); } catch {}
                 updateJniStatusBar();
             });
         }
@@ -130,10 +130,10 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
             const stats = constantsTreeProvider.getStats();
             const message = `📊 Constants Statistics:\n` +
-                `Total Constants: ${stats.total}\n` +
-                `With Suggestions: ${stats.withSuggestions}\n` +
-                `High Confidence: ${stats.highConfidence}\n` +
-                `Files: ${stats.files}`;
+                           `Total Constants: ${stats.total}\n` +
+                           `With Suggestions: ${stats.withSuggestions}\n` +
+                           `High Confidence: ${stats.highConfidence}\n` +
+                           `Files: ${stats.files}`;
             vscode.window.showInformationMessage(message);
         }
     );
@@ -145,7 +145,7 @@ export function activate(context: vscode.ExtensionContext) {
                 prompt: 'Search constants',
                 placeHolder: 'Enter constant name, value, or file name...'
             });
-
+            
             if (searchTerm !== undefined) {
                 constantsTreeProvider.setSearchFilter(searchTerm);
             }
@@ -161,11 +161,11 @@ export function activate(context: vscode.ExtensionContext) {
                 { label: '🔹 Group by Category', value: 'category' as const },
                 { label: '💡 Group by Suggestions', value: 'suggestions' as const }
             ];
-
+            
             const selected = await vscode.window.showQuickPick(options, {
                 placeHolder: 'Choose grouping method'
             });
-
+            
             if (selected) {
                 constantsTreeProvider.setGroupBy(selected.value);
             }
@@ -189,7 +189,7 @@ export function activate(context: vscode.ExtensionContext) {
             const uri = vscode.Uri.file(constant.file);
             const document = await vscode.workspace.openTextDocument(uri);
             const editor = await vscode.window.showTextDocument(document);
-
+            
             const position = new vscode.Position(constant.line, constant.column);
             editor.selection = new vscode.Selection(position, position);
             editor.revealRange(new vscode.Range(position, position));
@@ -201,15 +201,15 @@ export function activate(context: vscode.ExtensionContext) {
         async (constant: any, suggestion: string) => {
             const uri = vscode.Uri.file(constant.file);
             const document = await vscode.workspace.openTextDocument(uri);
-
+            
             try {
                 const workspaceEdit = new vscode.WorkspaceEdit();
                 const line = document.lineAt(constant.line);
                 const lineText = line.text;
-
+                
                 // Handle different constant declaration patterns
                 let newLineText = lineText;
-
+                
                 if (constant.language === 'java') {
                     // Java: static final TYPE NAME = value;
                     const javaRegex = /(static\s+final\s+\w+\s+)([A-Z_][A-Z0-9_]*)(\s*=\s*[^;]+;)/;
@@ -234,24 +234,24 @@ export function activate(context: vscode.ExtensionContext) {
                         }
                     }
                 }
-
+                
                 // Apply the edit
                 const range = new vscode.Range(constant.line, 0, constant.line, lineText.length);
                 workspaceEdit.replace(uri, range, newLineText);
-
+                
                 const success = await vscode.workspace.applyEdit(workspaceEdit);
-
+                
                 if (success) {
                     // Show success message with confidence
-                    const confidenceIcon = constant.confidence >= 80 ? '🔥' :
-                        constant.confidence >= 60 ? '💡' : '💭';
+                    const confidenceIcon = constant.confidence >= 80 ? '🔥' : 
+                                         constant.confidence >= 60 ? '💡' : '💭';
                     vscode.window.showInformationMessage(
                         `${confidenceIcon} Successfully renamed "${constant.name}" to "${suggestion}" (${constant.confidence}% confidence)`
                     );
-
+                    
                     // Refresh the constants view
                     await constantsTreeProvider.updateConstants();
-
+                    
                     // Show the change in the editor
                     const editor = await vscode.window.showTextDocument(document);
                     const position = new vscode.Position(constant.line, 0);
@@ -278,26 +278,6 @@ export function activate(context: vscode.ExtensionContext) {
         }
     );
 
-    // Create output channel for logging constant naming changes
-    const constantsLogChannel = vscode.window.createOutputChannel('Constants Naming Log');
-
-    // Log helper function
-    const logConstantAction = (action: string, value: string, suggestion: string, file?: string, line?: number) => {
-        const timestamp = new Date().toISOString();
-        const location = file && line !== undefined ? ` at ${file}:${line + 1}` : '';
-        constantsLogChannel.appendLine(`[${timestamp}] ${action}: "${value}" → "${suggestion}"${location}`);
-    };
-
-    // NEW: Copy constant name to clipboard command
-    const copyConstantNameCommand = vscode.commands.registerCommand(
-        'dependencyVisualizer.copyConstantName',
-        async (suggestion: string) => {
-            await vscode.env.clipboard.writeText(suggestion);
-            vscode.window.showInformationMessage(`📋 Copied "${suggestion}" to clipboard`);
-            logConstantAction('COPIED', 'suggestion', suggestion);
-        }
-    );
-
     const refreshConstantsCommand = vscode.commands.registerCommand(
         'dependencyVisualizer.refreshConstants',
         async () => {
@@ -305,7 +285,7 @@ export function activate(context: vscode.ExtensionContext) {
             vscode.window.showInformationMessage('Constants refreshed');
         }
     );
-
+    
     // Auto-refresh constants when files change
     const constantsFileWatcher = vscode.workspace.createFileSystemWatcher('**/*.{java,cpp,cc,cxx,c,h,hpp}');
     constantsFileWatcher.onDidChange(() => constantsTreeProvider.updateConstants());
@@ -319,7 +299,7 @@ export function activate(context: vscode.ExtensionContext) {
 
     // Initialize enhanced file connection list provider for the dedicated panel
     const enhancedFileConnectionListProvider = new EnhancedFileConnectionListProvider(analyzer);
-
+    
     // Register the enhanced file connections tree view in the custom container
     const enhancedFileConnectionsTreeView = vscode.window.createTreeView('enhancedFileConnectionsList', {
         treeDataProvider: enhancedFileConnectionListProvider,
@@ -351,10 +331,10 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
             const stats = enhancedFileConnectionListProvider.getStats();
             const message = `📊 Connection Statistics:\n` +
-                `Total Methods: ${stats.total}\n` +
-                `Connected: ${stats.connected}\n` +
-                `Missing: ${stats.missing}\n` +
-                `Packages: ${stats.packages}`;
+                           `Total Methods: ${stats.total}\n` +
+                           `Connected: ${stats.connected}\n` +
+                           `Missing: ${stats.missing}\n` +
+                           `Packages: ${stats.packages}`;
             vscode.window.showInformationMessage(message);
         }
     );
@@ -366,7 +346,7 @@ export function activate(context: vscode.ExtensionContext) {
                 prompt: 'Search file connections',
                 placeHolder: 'Enter file name, method name, or package...'
             });
-
+            
             if (searchTerm !== undefined) {
                 enhancedFileConnectionListProvider.setSearchFilter(searchTerm);
             }
@@ -381,11 +361,11 @@ export function activate(context: vscode.ExtensionContext) {
                 { label: '✅ Connected Only', value: 'connected' as const },
                 { label: '❌ Missing Only', value: 'missing' as const }
             ];
-
+            
             const selected = await vscode.window.showQuickPick(options, {
                 placeHolder: 'Filter connections by status'
             });
-
+            
             if (selected) {
                 enhancedFileConnectionListProvider.setStatusFilter(selected.value);
             }
@@ -400,11 +380,11 @@ export function activate(context: vscode.ExtensionContext) {
                 { label: '📦 Group by Package', value: 'package' as const },
                 { label: '🎯 Group by Status', value: 'status' as const }
             ];
-
+            
             const selected = await vscode.window.showQuickPick(options, {
                 placeHolder: 'Choose grouping method'
             });
-
+            
             if (selected) {
                 enhancedFileConnectionListProvider.setGroupBy(selected.value);
             }
@@ -418,12 +398,12 @@ export function activate(context: vscode.ExtensionContext) {
             if (item && item.connection && !item.connection.isMatched) {
                 const jniSignature = generateJniSignature(item.connection);
                 const stubCode = `JNIEXPORT void JNICALL ${jniSignature}(JNIEnv* env, jobject obj) {\n    // TODO: Implement ${item.connection.methodName}\n}\n`;
-
+                
                 const document = await vscode.workspace.openTextDocument({
                     content: stubCode,
                     language: 'cpp'
                 });
-
+                
                 await vscode.window.showTextDocument(document);
                 vscode.window.showInformationMessage('C++ stub generated! Save to your C++ file.');
             }
@@ -434,23 +414,23 @@ export function activate(context: vscode.ExtensionContext) {
     const refreshAllCommand = vscode.commands.registerCommand(
         'dependencyVisualizer.refreshAll',
         async () => {
-            // Refresh all data sources
-            const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
-            if (workspaceFolder) {
-                await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
-                await constantsAnalyzer.analyzeWorkspace(workspaceFolder);
-            }
-
-            // Refresh tree providers
-            if (enhancedFileConnectionListProvider) {
-                await enhancedFileConnectionListProvider.updateConnections();
-            }
-            if (constantsTreeProvider) {
-                await constantsTreeProvider.updateConstants();
-            }
-
-            vscode.window.showInformationMessage('✅ All data refreshed');
+        // Refresh all data sources
+        const workspaceFolder = vscode.workspace.workspaceFolders?.[0];
+        if (workspaceFolder) {
+            await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
+            await constantsAnalyzer.analyzeWorkspace(workspaceFolder);
         }
+        
+        // Refresh tree providers
+        if (enhancedFileConnectionListProvider) {
+            await enhancedFileConnectionListProvider.updateConnections();
+        }
+        if (constantsTreeProvider) {
+            await constantsTreeProvider.updateConstants();
+        }
+        
+        vscode.window.showInformationMessage('✅ All data refreshed');
+    }
     );
 
     context.subscriptions.push(refreshAllCommand);
@@ -497,7 +477,7 @@ export function activate(context: vscode.ExtensionContext) {
             }, async (progress) => {
                 const result = await analyzer.analyzeDependencies(workspaceFolder.uri.fsPath);
                 treeProvider.refresh();
-
+                
                 // Show diagnostics
                 const diagnostics = analyzer.getDiagnostics();
                 if (diagnostics.length > 0) {
@@ -513,7 +493,7 @@ export function activate(context: vscode.ExtensionContext) {
         'dependencyVisualizer.showDependencyGraph',
         () => {
             webviewProvider.showDependencyGraph();
-
+            
             // Track usage
             vscode.window.showInformationMessage(
                 'Dependency Graph opened! 🎨 Use the controls to navigate and explore your dependencies.',
@@ -538,7 +518,7 @@ export function activate(context: vscode.ExtensionContext) {
                 vscode.window.showErrorMessage('No active editor found');
                 return;
             }
-
+            
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
             if (!workspaceFolder) {
                 vscode.window.showErrorMessage('No workspace folder found');
@@ -551,31 +531,31 @@ export function activate(context: vscode.ExtensionContext) {
                 selection: editor.selection,
                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
             };
-
+            
             // FIX: Use instance method instead of static method
             const availableRefactorings = await refactoringProvider.getAvailableRefactorings(context);
-
+            
             if (availableRefactorings.length === 0) {
                 vscode.window.showInformationMessage('No refactoring options available at current position');
                 return;
             }
-
+            
             // FIX: Add explicit type annotation to resolve implicit any error
             interface RefactoringQuickPickItem extends vscode.QuickPickItem {
                 refactoring: any; // You can create a more specific type if needed
             }
-
+            
             const quickPickItems: RefactoringQuickPickItem[] = availableRefactorings.map((r: any) => ({
                 label: r.title,
                 description: r.description,
                 refactoring: r
             }));
-
+            
             const selectedRefactoring = await vscode.window.showQuickPick(
                 quickPickItems,
                 { placeHolder: 'Select refactoring operation' }
             );
-
+            
             // FIX: Correct property access
             if (selectedRefactoring) {
                 await refactoringProvider.executeRefactoring(selectedRefactoring.refactoring.id, context);
@@ -606,7 +586,7 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) return;
-
+            
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
             if (!workspaceFolder) return;
 
@@ -616,7 +596,7 @@ export function activate(context: vscode.ExtensionContext) {
                 selection: editor.selection,
                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
             };
-
+            
             const renamingProvider = new RenamingProvider();
             if (await renamingProvider.canApply(context)) {
                 const workspaceEdit = await renamingProvider.apply(context);
@@ -630,7 +610,7 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) return;
-
+            
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
             if (!workspaceFolder) return;
 
@@ -640,7 +620,7 @@ export function activate(context: vscode.ExtensionContext) {
                 selection: editor.selection,
                 language: editor.document.languageId === 'java' ? 'java' as const : 'cpp' as const
             };
-
+            
             const constantExtractor = new ConstantExtractor();
             if (await constantExtractor.canApply(context)) {
                 const workspaceEdit = await constantExtractor.apply(context);
@@ -668,18 +648,18 @@ export function activate(context: vscode.ExtensionContext) {
         async () => {
             const editor = vscode.window.activeTextEditor;
             if (!editor) return;
-
+            
             console.log('Document language:', editor.document.languageId);
             console.log('Selection:', editor.selection);
             console.log('Selected text:', editor.document.getText(editor.selection));
-
+            
             const workspaceFolder = vscode.workspace.getWorkspaceFolder(editor.document.uri);
             console.log('Workspace folder:', workspaceFolder?.uri.fsPath);
-
+            
             // Test file finding
             const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
             console.log('Found C++ files:', cppFiles.map(f => f.fsPath));
-
+            
             vscode.window.showInformationMessage('Debug info logged to console');
         }
     );
@@ -698,13 +678,11 @@ export function activate(context: vscode.ExtensionContext) {
         goToConstantCommand,
         applySuggestionCommand,
         applyBestSuggestionCommand,
-        copyConstantNameCommand,
-        constantsLogChannel,
         refreshConstantsCommand,
         constantsFileWatcher,
         // Tree views
         enhancedFileConnectionsTreeView,
-
+        
         // File connection related commands
         openFileCommand,
         showStatsCommand,
@@ -715,21 +693,21 @@ export function activate(context: vscode.ExtensionContext) {
         showJniIndexStatsCommand,
         generateStubCommand,
         refreshAllCommand,
-
+        
         // Main dependency commands
         analyzeCommand,
         showGraphCommand,
         refreshCommand,
         refactorCommand,
         executeRefactoringCommand,
-
+        
         // Individual refactoring commands
         renameCommand,
         extractConstantCommand,
-
+        
         // Debug command
         debugCommand,
-
+        
         // Watchers
         fileWatcher,
         connectionFileWatcher,
@@ -742,4 +720,4 @@ function generateJniSignature(connection: any): string {
     return `Java_com_example_Class_${connection.methodName}`;
 }
 
-export function deactivate() { }
+export function deactivate() {}
