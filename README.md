@@ -101,10 +101,11 @@ This extension contributes the following settings:
 Launch Extension Host
 
 1. Open the project folder in VS Code
-2. Press **F5** (or go to **Run → Start Debugging**)
+2. Press **F5** (or go to **Run → Start Debugging**) click on Debug Anyway if popup comes.
 3. A new VS Code window will open with the extension loaded
 4. Open any java file from a JNI project.
 
+For testing you can use this JNI repo https://community.opengroup.org/osdu/platform/domain-data-mgmt-services/seismic/open-vds
 
 
 
