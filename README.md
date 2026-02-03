@@ -1,20 +1,74 @@
-# Cross-Language Dependency Visualizer
+# Crosslink
 
-A comprehensive VS Code extension for analyzing and visualizing dependencies in Java and C/C++ projects, with special focus on cross-language dependencies and JNI (Java Native Interface) connections.
+CrossLink is an Static analysis tool designed to bridge the gap between Java and C/C++ codebases. It monitors
+ file changes, analyzes JNI (Java Native Interface) dependencies, and maintains the integrity of cross-language 
+ links, ensuring that refactoring in one language doesn't break the connection to the other.
+
+### Overview
+Maintaining large codebases that utilize JNI is challenging because standard IDEs often fail to track 
+dependencies across the language barrier. CrossLink solves this by providing real-time analysis, 
+dependency graphing, and automated refactoring support.
+
+## Architecture
+![alt text](crosslink_arch2-1.jpg)
+
+
+The system is composed of three primary layers:
+
+- **Input Layer**: Monitors the Java - C/C++ Codebase using a File Watcher to detect real-time changes.
+- **Core Service Layer**:
+  -**Constant Analyzer**: Tracks shared constants between Java and Native code.
+  -**Dependency Analyzer**: Maps the relationships between Java classes and C++ headers/implementations.
+  -**JNI Index**: A central database storing the mapping of all links.
+  -**Integrity Maintainer**: Ensures that moves or renames do not result in broken links.
+
+-**Presentation Layer**: Provides actionable insights including:
+  -**Constant Analysis & JNI Link Reports**.
+  -**Visual Dependency Graphs**.
+  -**Syntax Highlighting for JNI links**.
+  -**Automated Refactoring Actions (Copy & Move)**.
+
 
 ## Features
 
-### 🔍 Dependency Analysis & Visualization
-- **Multi-language support**: Analyzes Java (Maven/Gradle) and C++ (CMake/Conan/vcpkg) projects
-- **Dependency tree visualization**: Shows project dependencies in a hierarchical tree view
-- **Conflict detection**: Identifies version conflicts and missing libraries
-- **Platform compatibility checking**: Detects platform-specific issues (Windows/Linux/macOS)
 
-### 🔗 Cross-Language Connection Analysis
-- **JNI method matching**: Automatically finds connections between Java native methods and their C++ implementations
-- **File connection visualization**: Shows which Java files connect to which C++ files
-- **Missing implementation detection**: Identifies Java native methods without corresponding C++ stubs
-- **Connection statistics**: Provides metrics on cross-language dependencies
+
+
+### Dependency Visualization and Verification.
+  - **Dependency and JNI Link Graph**: The tool creates a visual graph of file-level dependencies. 
+  It clearly marks nodes where JNI implementations are missing. This gives developers a high-level 
+  view of the project’s binding status.
+  - **JNI Link Report**: While the graph shows file dependencies,the Link Report panel provides 
+  detailed, method-level dependencies in a table format. It lists every specific Java-to-C++
+  method link.
+
+
+### Interactive Navigation.
+  - **Live Link Highlighting**: As developers type, the tool highlights native method declarations 
+  in real-time (green for linked, red for broken). This prevents waiting for runtime 
+  UnsatisfiedLinkError exceptions. As explaied in below code snippet.
+  - **Cross-Language Navigation**: Developers can click on a successfully linked Java native method 
+  to quickly jump to its corresponding C++ implementation definition. This simplifies code 
+  exploration. In figure 2 we can see Goto implementation option above the highlighted link.
+
+### Link Integrity and Constant Naming.
+ - **JNI Link Integrity Maintainer**: Developers can move or copy native methods between Java 
+ classes, CrossLink automatically updates the corresponding C++ function signatures to match 
+ the new package and class path, preventing broken links.
+ - **Constant Naming Assistance**: The tool identifies numeric values passed across the JNI 
+ boundary and suggests meaningful constant names in a centralized “Constant Analysis” panel.
+
+During copy operations, CrossLink checks for an existing C/C++ implementation file for the target 
+java file and generates the correct JNI function name & signature. If no file exists, it 
+initializes one,though developers must manually transfer the function body. Move operations 
+automatically update the JNI function name in the source C/C++ file.
+
+The constant naming assistance uses a rule-based engine that analyzes each value’s context against 
+predefined patterns to suggest descriptive identifiers. For example, the system applies a TimeDomain 
+rule to suggest TIMEOUT_DURATION for values like 3000 in time-sensitive code, an Infrastructure rule 
+to propose SERVER_PORT for 8080 in networking contexts, and recognizes mathematical operations like 
+price * 1.15 to suggest TAX_RATE_MULTIPLIER.
+
 
 ### 🎨 Cross-Language Code Highlighting
 - **Library Loading**: Highlights `System.loadLibrary()` calls with different colors based on OS compatibility and file presence
@@ -27,47 +81,31 @@ A comprehensive VS Code extension for analyzing and visualizing dependencies in 
   - Windows: `.dll`
   - Linux: `.so`
   - macOS: `.dylib`
-- **JNI Signature Detection**: Automatically generates expected JNI function names for native methods
-- **Cross-language validation**: Checks C++ files for matching JNI function implementations
-- **Hover information**: Detailed information about library status and native method implementation when hovering over highlighted code
-- **Code lens**: Shows library status and native method status directly in the editor with clickable actions
 
-### 🔧 Code Refactoring Tools
-- **Magic number detection**: Finds hardcoded numbers that should be constants
-- **Constant extraction**: Converts magic numbers to named constants with intelligent naming suggestions
-- **Native method refactoring**: Helps move and reorganize JNI methods
-- **Symbol renaming**: Cross-language aware renaming capabilities
-- **C++ stub generation**: Automatically generates C++ implementation stubs for Java native methods
+- **Hover information**: Detailed information about library status and native method implementation when hovering over highlighted code
+
+
+
 
 ### 📊 Constants Management
 - **Constants analyzer**: Scans for constants across Java and C++ files
-- **Naming suggestions**: Provides intelligent constant naming based on context and usage
+- **Naming suggestions**: Provides constant naming based on context and usage
 - **Magic number identification**: Detects numbers that should be extracted as constants
 - **Context-aware categorization**: Groups constants by type, file, or usage context
 
+
 ### 🎛️ Interactive Dashboard
-- **Webview-based control panel**: Modern UI for managing all features
+- **Webview-based control panel**: UI for managing all features
 - **Real-time statistics**: Shows dependency counts, connection metrics, and constants analysis
-- **Search and filtering**: Advanced filtering capabilities for all data
-- **Quick actions**: Context menus for common refactoring operations
+- **Search and filtering**: Advanced filtering capabilities for all data (or in simple terms a search button)
+- **Quick actions**: Context menus for common refactoring operations (Copy or Move)
 
 ## Requirements
 
-- Visual Studio Code 1.74.0 or higher
+- Visual Studio Code
 - Java projects with native dependencies (JNI)
 - C++ projects that interface with Java
-- Node.js for development (if building from source)
 
-## Usage
-
-### Library Highlighting Feature
-
-The extension automatically highlights `System.loadLibrary()` calls in Java files with different colors:
-
-1. **Open a Java file** containing `System.loadLibrary()` calls
-2. **Hover over the highlighted code** to see detailed information
-3. **Click on code lens** (if available) to see library information
-4. **Right-click** in the editor and select "Refresh Library Highlights" to update
 
 #### Example:
 ```java
@@ -83,25 +121,21 @@ public class HelloJNI {
 }
 ```
 
-#### Color Meanings:
-- 🔴 **Red**: Library file is missing OR native method has no C++ implementation
-- 🔵 **Blue**: Library exists but has wrong extension for current platform
-- 🟢 **Green**: Library exists with correct extension OR native method has C++ implementation
-- 🔗 **Link Icon**: Indicates cross-language connection (native methods)
-
-## Extension Settings
-
-This extension contributes the following settings:
-
-* `dependencyVisualizer.autoRefresh`: Automatically refresh dependencies when build files change (default: true)
-* `dependencyVisualizer.showPlatformWarnings`: Show platform compatibility warnings (default: true)
 
 # Running the Cross-Language Dependency Visualizer Extension
+
+# Clone the repository
+```terminal
+git clone https://github.com/yourusername/crosslink.git
+```
+# Navigate to the directory
+cd crosslink
+
 
 Launch Extension Host
 
 1. Open the project folder in VS Code
-2. Press **F5** (or go to **Run → Start Debugging**) click on Debug Anyway if popup comes.
+2. Press **F5** (or go to **Run → Start Debugging**) click on "Debug Anyway" if popup comes.
 3. A new VS Code window will open with the extension loaded
 4. Open any java file from a JNI project.
 
@@ -147,4 +181,3 @@ You can author your README using Visual Studio Code. Here are some useful editor
 * [Visual Studio Code's Markdown Support](http://code.visualstudio.com/docs/languages/markdown)
 * [Markdown Syntax Reference](https://help.github.com/articles/markdown-basics/)
 
-**Enjoy!**
