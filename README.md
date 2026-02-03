@@ -68,9 +68,17 @@ the active Java file. The process follows two steps:
   - **Live Link Highlighting**: As developers type, the tool highlights native method declarations 
   in real-time (green for linked, red for broken). This prevents waiting for runtime 
   UnsatisfiedLinkError exceptions. As explaied in below code snippet.
+    - 🟢 **Green**: Java method declaration present in some C/C++ file.
+    - 🔴 **Red**: Java method declaration Missing indicating broken link.
+
   - **Cross-Language Navigation**: Developers can click on a successfully linked Java native method 
   to quickly jump to its corresponding C++ implementation definition. This simplifies code 
-  exploration. In figure 2 we can see Goto implementation option above the highlighted link.
+  exploration. In below figure we can see Goto implementation option above the highlighted link.
+
+<p align="center">
+  <img src="Code_green - Copy.png" width="600">
+</p>
+
 
 ### Link Integrity and Constant Naming.
  - **JNI Link Integrity Maintainer**: Developers can move or copy native methods between Java 
