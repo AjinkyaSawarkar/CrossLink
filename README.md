@@ -17,22 +17,43 @@ The system is composed of three primary layers:
 
 - **Input Layer**: Monitors the Java - C/C++ Codebase using a File Watcher to detect real-time changes.
 - **Core Service Layer**:
-  -**Constant Analyzer**: Tracks shared constants between Java and Native code.
-  -**Dependency Analyzer**: Maps the relationships between Java classes and C++ headers/implementations.
-  -**JNI Index**: A central database storing the mapping of all links.
-  -**Integrity Maintainer**: Ensures that moves or renames do not result in broken links.
+  - **Constant Analyzer**: Tracks shared constants between Java and Native code.
+  - **Dependency Analyzer**: Maps the relationships between Java classes and C++ headers/implementations.
+  - **JNI Index**: A central database storing the mapping of all links.
+  - **Integrity Maintainer**: Ensures that moves or renames do not result in broken links.
 
--**Presentation Layer**: Provides actionable insights including:
-  -**Constant Analysis & JNI Link Reports**.
-  -**Visual Dependency Graphs**.
-  -**Syntax Highlighting for JNI links**.
-  -**Automated Refactoring Actions (Copy & Move)**.
+- **Presentation Layer**: Provides actionable insights including:
+  - **Constant Analysis Report**
+  - **JNI Link Reports**
+  - **Visual Dependency Graphs.**
+  - **Syntax Highlighting for JNI links & library.**
+
+
+## JNI Indexing and Performance
+A major challenge in cross-language tools is scalability. Parsing an entire Java and C/C++ codebase for 
+every keystroke is not feasible due to high computational demands. To maintain high performance 
+and quick feedback, CrossLink uses a persistent JNI Index.
+
+- **Index Construction** - Upon initialization, CrossLink scans all c and cpp files within the workspace. 
+It extracts function names that adhere to the standard JNI naming convention
+(i.e., Java_PackageName_ClassName_MethodName).
+These function signatures are mapped to their corresponding file paths in the JNI Index. This index is 
+computed once and is only rebuilt when changes are detected in the C/C++ source files. These 
+file changes are detected by File Watcher. File Watcher triggers re-analysis in the dependency analyzer 
+and the constant analyzer.
+
+- **Lookup and Live Highlighting** - To provide live feedback in the editor, CrossLink minimizes parsing overhead by scanning only
+the active Java file. The process follows two steps:
+
+  - **(1) Native Scanning**: The tool scans the Java file, specifically looking for lines that include the native keyword. It
+  captures the package, class, and method names to create the expected C++ function name.
+
+  - **(2) Index Query**: These computed names are checked against the pre-built JNI Index. If a match is found, the connection 
+  is noted, and the link is highlighted in green. If no match is found, the link gets highlighted in red, providing 
+  immediate visual feedback about the broken link.
 
 
 ## Features
-
-
-
 
 ### Dependency Visualization and Verification.
   - **Dependency and JNI Link Graph**: The tool creates a visual graph of file-level dependencies. 
