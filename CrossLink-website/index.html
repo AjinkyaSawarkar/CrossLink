@@ -1,0 +1,397 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <title>SLEM : Software Library Energy Meter</title>
+    <!-- Meta -->
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="description" content="">
+    <meta name="author" content="">
+    <link rel="shortcut icon" href="favicon.ico">
+    <link
+        href='https://fonts.googleapis.com/css?family=Open+Sans:300italic,400italic,600italic,700italic,800italic,400,300,600,700,800'
+        rel='stylesheet' type='text/css'>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0-beta3/css/all.min.css">
+    <!-- FontAwesome JS -->
+    <script defer src="assets/fontawesome/js/all.js"></script>
+    <!-- Global CSS -->
+    <link rel="stylesheet" href="assets/plugins/bootstrap/css/bootstrap.min.css">
+    <!-- Plugins CSS -->
+    <link rel="stylesheet" href="assets/plugins/prism/prism.css">
+    <link rel="stylesheet" href="assets/plugins/elegant_font/css/style.css">
+
+    <!-- Theme CSS -->
+    <link id="theme-style" rel="stylesheet" href="assets/css/styles.css">
+
+</head>
+
+<body class="body-green">
+    <div class="page-wrapper">
+        <!-- Header -->
+        <header id="header" class="header">
+            <div class="container">
+                <div class="branding">
+                    <h1 class="logo">
+                        <a href="index.html">
+                            <!-- <span aria-hidden="true" class="icon_documents_alt icon"></span> -->
+                            <span class="text-highlight"></span><span class="text-bold">SLEM : Software Library Energy Meter</span>
+                        </a>
+                    </h1>
+
+                </div>
+<!-- 
+                <div class="top-search-box">
+                    <form class="form-inline search-form justify-content-center" action="" method="get">
+                        <input type="text" placeholder="Search..." name="search" class="form-control search-input">
+                        <button type="submit" class="btn search-btn" value="Search"><i
+                                class="fas fa-search"></i></button>
+                    </form>
+                </div>
+ -->
+            </div><!--//container-->
+        </header>
+
+        <!-- Main Body -->
+        <div class="doc-wrapper">
+            <div class="container">
+                <!-- Quick Start -->
+                <div id="doc-header" class="doc-header text-center">
+                    <h1 class="doc-title"><i class="icon fa fa-paper-plane"></i> Quick Start</h1>
+                    <div class="meta"><i class="far fa-clock"></i> Last updated: Oct 28th,2025</div>
+                </div>
+
+                <!-- Main Body -->
+                <div class="doc-body row">
+                    <!-- Main Body -->
+                    <div class="doc-content col-md-9 col-12 order-1">
+                        <div class="content-inner">
+
+                            <!-- Tool Description -->
+                            <section id="download-section" class="doc-section">
+                                <h1 class="section-title">Software Library Energy Meter (SLEM) : An Automated Energy Measurement Tool for Software Libraries</h1>
+                                <br>
+                                <h3 class="block-title">Tool Description</h3>
+                                <div class="section-block">
+                                    <p>
+                                        SLEM is an energy measurement tool
+                                        designed to measure energy consumption seamlessly across
+                                        various software frameworks, libraries, and custom scripts.
+                                        At its core, SLEM utilizes the Intel Running Average Power
+                                        Limit (RAPL) interface, a widely recognized mechanism for
+                                        monitoring and reporting the energy consumption of vari-
+                                        ous system-on-chip (SoC) power domains. 
+                                        <br>The
+                                        tool features a user-friendly interface that eliminates the
+                                        need for manual script writing, allowing users to seamlessly
+                                        specify input parameters for API-level energy consumption
+                                        measurements.       
+                                        <br>              
+                                        The current version of the tool supports only <b>Linux</b> , with
+                                        plans to extend support to Windows and MacOS in future
+                                        updates.
+                                    </p>
+                                </div>
+                            </section>
+
+                            <!-- Installation -->
+                            <section id="installation-section" class="doc-section">
+                                <h2 class="section-title">Installation</h2>
+
+                                <div id="step1" class="section-block">
+
+                                    <!-- Requirements -->
+                                    <h3 class="block-title" id="requirements">Requirements</h3>
+                                    <div class="code-block">
+                                        <p>
+                                        <ul>
+                                            <li>Intel processors from the Celeron, Pentium, Core i3, i7, i9, and Xeon
+                                                series, featuring the Sandy Bridge or newer architecture.</li>
+                                            <li>Linux distribution Debian based operating system. We have tested on
+                                                Ubuntu 20.04.6 LTS</li>
+                                            <li>Python version 3.7.0 and above. Install from 
+                                                <a class="simple-link" href="https://www.python.org/downloads/" target="_blank">
+                                                    here</a>
+                                                </li>
+                                            <!-- <li>If on Windows, then PowerGadget v3.6 has to installed. Click <a id="downloadLinkPg" href="https://raw.githubusercontent.com/rishalab/CPPJoules/main/PowerGadget_3.6.msi" target="_blank" class="simple-link">here</a> to install -->
+                                        </p>
+                                    </div>
+
+                                    <!-- Github -->
+                                    <h3 class="block-title" id="from-github">Github Repo</h3>
+                                    <div class="code-block">
+                                        <p>Our entire codebase is in this Github repo : <span
+                                                class="highlight">https://github.com/rishalab/SLEM.git</span>, you
+                                            can either clone or download it to check it.</p>
+                                        <div class="code-container">
+                                            <div class="code" id="codeToCopy1">git clone https://github.com/rishalab/SLEM.git</div>
+                                            <button class="copy-button" onclick="copyCode('codeToCopy1')">
+                                                <i class="far fa-clipboard"></i> Copy code
+                                            </button>
+                                        </div>
+                                        <!-- <p>For running the SLEM tool follow the below steps.</p> -->
+                                    </div>
+                                </div>
+                            </section>
+
+
+                            <!-- Usage -->
+                            <section id="usage-section" class="doc-section">
+                                <h2 class="section-title">Usage</h2>
+                                <ol>
+                                    <li>Granting Access to Energy RAPL for Experimentation</li>
+                                    To measure energy consumption using RAPL domains, 
+                                    ensure that your system provides the necessary read access to the powercap files. 
+                                    By default, these files are often restricted, and you may need to grant temporary access during experiments.
+                                    <div class="code-container">
+                                        <div class="code" id="codeToCopy2">
+                                            sudo chmod -R +r /sys/class/powercap/
+                                        </div>
+                                        <button class="copy-button" onclick="copyCode('codeToCopy2')">
+                                            <i class="far fa-clipboard"></i> Copy code
+                                        </button>
+                                    </div>
+                                    <li>Navigate to the <span class="highlight">src</span> folder:</li>
+                                    <div class="code-container">
+                                        <div class="code" id="codeToCopy3">
+                                            cd path/to/SLEM/src
+                                        </div>
+                                        <button class="copy-button" onclick="copyCode('codeToCopy3')">
+                                            <i class="far fa-clipboard"></i> Copy code
+                                        </button>
+                                    </div>
+                                    <li>Run the <span class="highlight">main.py</span> file:</li>
+                                    <div class="code-container">
+                                        <div class="code" id="codeToCopy4">
+                                            python3 main.py
+                                        </div>
+                                        <button class="copy-button" onclick="copyCode('codeToCopy4')">
+                                            <i class="far fa-clipboard"></i> Copy code
+                                        </button>
+                                    </div>
+                                    or
+                                    <div class="code-container">
+                                        <div class="code" id="codeToCopy5">
+                                            python main.py
+                                        </div>
+                                        <button class="copy-button" onclick="copyCode('codeToCopy5')">
+                                            <i class="far fa-clipboard"></i> Copy code
+                                        </button>
+                                    </div>
+                                    <li>Upon running <span class="highlight">main.py</span>, the following screen will appear:</li>
+                                    <img class="img-fluid" src="SLEM.jpg" alt="SLEM interface" />
+                                    <li>The interface contains the following sections:</li>
+                                    <ol>
+                                        <li>Module Selection</li>
+                                        <li>File Selection</li>
+                                        <li>Dataset Selection</li>
+                                        <li>Module Manager</li>
+                                        <li>Dataset Manager</li>
+                                        <li>Reporting Module</li>
+                                        <li>Parameter Configuration Screen</li>
+                                    </ol>
+                                    <li>To measure the energy consumption of a specific module (e.g., <span class="highlight">numpy</span>), follow these steps:</li>
+                                    <ul>
+                                        <li>Enter the module name in the Module Manager (e.g., <span class="highlight">numpy</span>).</li>
+                                        <li>Click the <b>Add</b> button.</li>
+                                        <li>The module will then be available in the Module Selection dropdown on the left side of the screen.</li>
+                                    </ul>
+                                    <li>Select the desired module from the dropdown to display all its functions, as shown below:</li>
+                                    <img class="img-fluid" src="numpy.jpg" alt="Module functions" />
+                                    <li>Select the checkbox of the function you want to measure. The parameters of the selected function will appear in the Parameter Configuration Screen.</li>
+                                    <li>Adjust the parameters as needed, specify the frequency (number of iterations), and set the interval time (time gap between iterations in seconds).</li>
+                                    <li>Click the <b>Run</b> button to execute the experiment. The results will be displayed in the Reporting Module at the bottom.</li>
+                                    <li>You can also define your own functions in a Python file (e.g., <span class="highlight">measure_energy.py</span>).</li>
+                                    <ul>
+                                        <li>Click the <b>Browse</b> button in the File Selection module to navigate to and select your file.</li>
+                                        <li>Select your file from the Module Selection dropdown. All defined functions in the file will be displayed below.</li>
+                                    </ul>
+                                    <li>To upload a dataset:</li>
+                                    <ul>
+                                        <li>Click the <b>Browse</b> button in the Dataset Manager section and select the desired dataset.</li>
+                                        <li>Each loaded dataset is assigned a dataframe ID (e.g., <span class="highlight">df_0</span>), visible in the Dataset Manager section at the bottom right.</li>
+                                    </ul>
+                                    <img class="img-fluid" src="Dataset_Manager.jpg" alt="Dataset Manager" />
+                                    <li>The dataframe ID (e.g., <span class="highlight">df_0</span>) can be used as an argument in functions requiring dataset input.</li>
+                                </ol>
+                            </section>
+                            
+                            <!-- Architecture -->
+                            <section id="architecture-section" class="doc-section">
+                                <h2 class="section-title">Architecture Overview</h2>
+                                <p>The tool consists of three primary components, as shown in Fig. 1 and described below:</p>
+                                <ul>
+                                    <li><strong>Energy Measurement Engine (Main)</strong>:<br>
+                                    At the core of SLEM is the energy measurement module, which utilizes the powercap interface to interact with hardware-level interfaces and collect real-time energy consumption data for specific functions.</li>
+                                    
+                                    <li><strong>Graphical User Interface (GUI)</strong>:<br>
+                                    A user-friendly GUI enables seamless interaction, providing an intuitive platform for selecting files, datasets, functions, and parameters for profiling.</li>
+                                    
+                                    <li><strong>Execution and Reporting Module (RUNNER)</strong>:<br>
+                                    This component handles the execution of selected functions with user-defined parameters and generates energy consumption reports for analysis.</li>
+                                </ul>
+                                <img class="img-fluid" src="workflowdiagram.png" alt="elegant icons" />
+                            </section>
+
+                            <!-- Functional Workflow -->
+                            <section id="function-workflow-section" class="doc-section">
+                                <h2 class="section-title">Functional Workflow</h2>
+                                <ol>
+                                    <li><strong>File and Dataset Selection</strong>:<br>
+                                    Upon launching SLEM, the user is presented with an interface to select the source file, the modules within the file, and the datasets. This step ensures that the tool is adaptable for various projects and applications.</li>
+                            
+                                    <li><strong>Function Identification</strong>:<br>
+                                    Once a file is loaded, the tool analyzes the source code to extract the list of functions. These functions are displayed to the user in a selectable list format.</li>
+                            
+                                    <li><strong>Parameter Configuration</strong>:<br>
+                                    After selecting a function, the user is prompted to configure profiling parameters:
+                                    <ul>
+                                        <li><strong>Frequency</strong>: The number of times the selected function is executed to minimize random errors and improve precision.</li>
+                                        <li><strong>Time Interval</strong>: The duration between consecutive runs of the selected function, enabling precise control over execution timing.</li>
+                                    </ul>
+                                    </li>
+                            
+                                    <li><strong>Execution</strong>:<br>
+                                    A <strong>Run</strong> button initiates the execution of the selected function with the configured parameters. The energy measurement engine tracks the energy consumption in real-time during the execution.</li>
+                            
+                                    <li><strong>Results Visualization</strong>:<br>
+                                    The energy profiling results are stored in a CSV file generated after the function is run. This file contains package, core, uncore, and DRAM energy values.</li>
+                                </ol>
+                            </section>
+
+                            <!-- Code Snippets -->
+                            <section id="feature-section" class="doc-section">
+                                <h2 class="section-title">Example Functionality</h2>
+                                <div class="section-block">
+                                    <ol>
+                                        <h3>
+                                            <li>
+                                                Testing for custom script in the SLEM tool
+                                                <br><br>
+                                                <img class="img-fluid" src="example.jpg" alt="screenshot" />
+                                            </li>
+                                        </h3>
+                                    </ol>
+                                </div>
+                            </section>
+
+                            <!-- Goal -->
+                            <section id="goal-section" class="doc-section">
+                                <h2 class="section-title">Goal</h2>
+                                <div class="section-block">
+                                    The goal of SLEM is to provide an intuitive and efficient platform for profiling the energy consumption of software functions, 
+                                    enabling developers and researchers to optimize performance and reduce energy usage. By offering real-time energy measurement, 
+                                    comprehensive reporting, and a user-friendly interface, the tool empowers users to make data-driven decisions for 
+                                    energy-efficient software development and analysis.
+                                </div>
+                            </section>
+
+                            <!-- Limitations -->
+                            <section id="limitations-section" class="doc-section">
+                                <h2 class="section-title">Limitations</h2>
+                                <div class="section-block">
+                                    The current setup includes energy overhead from the GUI, 
+                                    impacting the accuracy of computational task measurements.
+                                    We plan to develop a command-line version to reduce this overhead. 
+                                    Additionally, the tool is currently unavailable on Windows and macOS, 
+                                    with plans for future cross-platform compatibility.
+                                </div>
+                            </section>
+
+                            <!-- Results -->
+                            <section id="result-section" class="doc-section">
+                                <h2 class="section-title">Results</h2>
+                                <div class="section-block">
+                                    For this evaluation, the <a href="https://archive.ics.uci.edu/dataset/2/adult" target="_blank" >Adult dataset</a> 
+                                    and the <a href="https://archive.ics.uci.edu/dataset/116/us+census+data+1990" target="_blank" >US Census dataset</a>, 
+                                    both widely recognized benchmarks in machine learning and data processing, were utilied.
+                                    The dataframe processing tasks executed during the evaluation were consistent with those described 
+                                    by <a href="https://www.researchgate.net/publication/363500717_On_the_Energy_Consumption_of_Different_Dataframe_Processing_Libraries_--_An_Exploratory_Study" target="_blank" >Shanbhag et al.</a>, ensuring methodological alignment.
+                                    The evaluation results can be found here : 
+                                    <strong>
+                                        <a href="https://github.com/rishalab/SLEM/tree/main/evaluation" target="_blank" >Results</a>
+                                    </strong>
+                                </div>
+                            </section>
+
+                            <!-- Demo Video -->
+                            <section id="video-section" class="doc-section">
+                                <h2 class="section-title">Demo Video</h2>
+                                <div class="section-block">
+                                    <div class="row">
+                                        <div class="col-md-6 col-12">
+                                            <div class="embed-responsive embed-responsive-4by3">
+                                                <iframe width="729" height="410" src="https://youtube.com/embed/oRsxfT_kNNk" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                                <!-- <iframe width="729" height="410" src="https://youtube.com/embed/zlCG2OPw2XM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
+                                                <!-- <iframe width="729" height="410" src="https://www.youtube.com/embed/fR8cOOuxqfk" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
+                                                <!-- <iframe width="729" height="410" src="https://www.youtube.com/embed/W6yiaXK2rEM" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                                <iframe width="729" height="410" src="https://www.youtube.com/embed/eLcOIPiGt_g" title="YouTube video player" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe>
+                                                <iframe width="560" height="315" src="https://www.youtube.com/embed/GNrJfZ0RCVI" frameborder="0" allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture" allowfullscreen></iframe> -->
+                                            </div>
+                                        </div>
+                                    </div>
+                                </div>
+                            </section>
+
+                        </div>
+                    </div>
+
+                    <!-- Side Scroll Bar -->
+                    <div class="doc-sidebar col-md-3 col-12 order-0 d-none d-md-flex">
+                        <div id="doc-nav" class="doc-nav">
+                            <nav id="doc-menu" class="nav doc-menu flex-column sticky">
+                                <a class="nav-link scrollto" href="#download-section">Download</a>
+                                <a class="nav-link scrollto" href="#installation-section">Installation</a>
+                                <nav class="doc-sub-menu nav flex-column">
+                                    <a class="nav-link scrollto" href="#requirements">Requirements</a>
+                                    <a class="nav-link scrollto" href="#from-github">Github Repo</a>
+                                    <!-- <a class="nav-link scrollto" href="#from-direct">Direct Installer Link</a>
+                                    <nav class="doc-sub-sub-menu nav flex-column">
+                                        <a class="nav-link scrollto" href="#from-linux">Linux</a>
+                                        <a class="nav-link scrollto" href="#from-windows">Windows</a>
+                                    </nav> -->
+                                </nav>
+                                <a class="nav-link scrollto" href="#usage-section">Usage</a>
+                                <a class="nav-link scrollto" href="#architecture-section">Architecture Overview</a>
+                                <a class="nav-link scrollto" href="#function-workflow-section">Functional Workflow</a>
+                                <a class="nav-link scrollto" href="#feature-section">Example Functionality</a>
+                                <a class="nav-link scrollto" href="#goal-section">Goal</a>
+                                <a class="nav-link scrollto" href="#result-section">Results</a>
+                                <a class="nav-link scrollto" href="#video-section">Demo Video</a>
+                            </nav>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <!-- Footer -->
+        <div id="promo-block" class="promo-block">
+            <div class="container">
+                <div class="promo-block-inner">
+                    <div class="content-holder col-lg-7 col-md-6 col-7">
+                        <div class="content-holder-inner">
+                            <div class="desc">
+                                <h3 class="promo-title">Contributors</h3>
+                                <!-- <p> Rajrupa chattaraj, Sridhar Chimalakonda</p> -->
+                                <p> Akilesh P, Shivadharshan S, Rajrupa chattaraj, Sridhar Chimalakonda, Vibhu Saujanya Sharma, Vikrant Kaulgud</p>
+                                <!-- <a class="btn btn-cta" href="" target="_blank"><i class="fas fa-external-link-alt"></i> Preprint</a> -->
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <!-- Main Javascript -->
+    <script type="text/javascript" src="assets/plugins/jquery-3.4.1.min.js"></script>
+    <script type="text/javascript" src="assets/plugins/bootstrap/js/bootstrap.min.js"></script>
+    <script type="text/javascript" src="assets/plugins/prism/prism.js"></script>
+    <script type="text/javascript" src="assets/plugins/jquery-scrollTo/jquery.scrollTo.min.js"></script>
+    <script type="text/javascript" src="assets/plugins/stickyfill/dist/stickyfill.min.js"></script>
+    <script type="text/javascript" src="assets/js/main.js"></script>
+</body>
+
+</html>
