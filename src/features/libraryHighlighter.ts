@@ -181,6 +181,55 @@ export class LibraryHighlighter {
             }
         });
 
+                // ── NEW: Watch C++ file saves → incremental index update + re-highlight Java ──
+        const cppExtensions = new Set(['.cpp', '.cc', '.cxx', '.c', '.h', '.hpp']);
+        const isCppFile = (doc: vscode.TextDocument) => {
+            const ext = doc.uri.fsPath.substring(doc.uri.fsPath.lastIndexOf('.'));
+            return cppExtensions.has(ext);
+        };
+        const onDidSaveCpp = vscode.workspace.onDidSaveTextDocument(async (document) => {
+            if (isCppFile(document)) {
+                // Incrementally update JNI index for just this file
+                const analyzer = getAnalyzer();
+                if (analyzer) {
+                    await analyzer.updateJniIndexForFile(document.uri.fsPath);
+                }
+                // Re-highlight all visible Java editors immediately
+                await this.refreshHighlights();
+            }
+        });
+        // ── NEW: Watch Java file saves → immediate re-highlight ──
+        const onDidSaveJava = vscode.workspace.onDidSaveTextDocument(async (document) => {
+            if (document.languageId === 'java') {
+                this.scheduleHighlight(document, 100); // faster refresh on save
+            }
+        });
+        // ── NEW: Watch C++ file creation/deletion via FileSystemWatcher ──
+        const cppWatcher = vscode.workspace.createFileSystemWatcher('**/*.{cpp,cc,cxx,c,h,hpp}');
+        cppWatcher.onDidCreate(async (uri) => {
+            const analyzer = getAnalyzer();
+            if (analyzer) {
+                await analyzer.updateJniIndexForFile(uri.fsPath);
+            }
+            await this.refreshHighlights();
+        });
+        cppWatcher.onDidDelete(async (uri) => {
+            const analyzer = getAnalyzer();
+            if (analyzer) {
+                analyzer.invalidateJniIndexForFile(uri.fsPath);
+            }
+            await this.refreshHighlights();
+        });
+        cppWatcher.onDidChange(async (uri) => {
+            // File changed on disk (e.g. external edit, git checkout)
+            const analyzer = getAnalyzer();
+            if (analyzer) {
+                await analyzer.updateJniIndexForFile(uri.fsPath);
+            }
+            await this.refreshHighlights();
+        });
+
+
         context.subscriptions.push(
             hoverProvider,
             codeLensProvider,
@@ -190,7 +239,10 @@ export class LibraryHighlighter {
             goToImplementationCommand,
             onDidChangeActiveTextEditor,
             onDidChangeTextDocument,
-            onDidOpenTextDocument
+            onDidOpenTextDocument,
+            onDidSaveCpp,
+            onDidSaveJava,
+            cppWatcher
         );
 
         // Initial highlight
