@@ -70,12 +70,54 @@ export class DependencyAnalyzer {
         return this.projects;
     }
 
-    // Public API: rebuild the JNI index on demand
+    // Public API: rebuild the JNI index on demand (full rebuild — scans all files)
     async rebuildJniIndex(): Promise<{ symbols: number; files: number }> {
         this.jniIndex = await this.buildJniSymbolIndex();
         return this.getJniIndexStats();
     }
 
+    // Public API: incrementally update the JNI index for a single file (O(1 file) instead of O(all files))
+    async updateJniIndexForFile(filePath: string): Promise<void> {
+        // Ensure index exists — if it hasn't been built yet, do a full build
+        if (!this.jniIndex) {
+            this.jniIndex = await this.buildJniSymbolIndex();
+            return;
+        }
+        // 1) Remove old symbols from this file
+        for (const [symbol, filePaths] of this.jniIndex.entries()) {
+            filePaths.delete(filePath);
+            if (filePaths.size === 0) {
+                this.jniIndex.delete(symbol);
+            }
+        }
+        // 2) Re-scan the single file and add new symbols
+        try {
+            const fsPromises = require('fs').promises as typeof import('fs').promises;
+            const content = await fsPromises.readFile(filePath, 'utf8');
+            const query = /Java_([A-Za-z0-9_]+(?:__[-_A-Za-z0-9$]+)?)\s*\(/g;
+            let m: RegExpExecArray | null;
+            while ((m = query.exec(content)) !== null) {
+                const symbol = 'Java_' + m[1];
+                if (!this.jniIndex.has(symbol)) this.jniIndex.set(symbol, new Set<string>());
+                this.jniIndex.get(symbol)!.add(filePath);
+            }
+        } catch {
+            // File may have been deleted — symbols already removed above
+        }
+    }
+    // Public API: remove all index entries for a file (e.g. on delete/rename)
+    invalidateJniIndexForFile(filePath: string): void {
+        if (!this.jniIndex) return;
+        for (const [symbol, filePaths] of this.jniIndex.entries()) {
+            filePaths.delete(filePath);
+            if (filePaths.size === 0) {
+                this.jniIndex.delete(symbol);
+            }
+        }
+    }
+
+
+    
     // Public API: quick stats of current index
     getJniIndexStats(): { symbols: number; files: number } {
         const symbols = this.jniIndex ? this.jniIndex.size : 0;
