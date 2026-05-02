@@ -458,9 +458,12 @@ export class NativeMethodMover implements RefactoringOperation {
 
     private extractClassName(document: vscode.TextDocument): string {
         const content = document.getText();
-        // Match actual class declaration, not comments containing "class"
-        const classMatch = content.match(/(?:public|private|protected|abstract|final|\s)*\bclass\s+(\w+)/);
-        return classMatch ? classMatch[1] : '';
+        // Strip block comments (Javadoc) and line comments before matching
+        const stripped = content
+            .replace(/\/\*[\s\S]*?\*\//g, '')   // remove /* ... */
+            .replace(/\/\/[^\n]*/g, '');         // remove // ...
+        const classMatch = stripped.match(/^(?:public\s+|protected\s+|private\s+)?(?:abstract\s+|final\s+)?class\s+(\w+)/m);
+    return classMatch ? classMatch[1] : '';
     }
 
     private extractPackageName(document: vscode.TextDocument): string {
