@@ -10,7 +10,6 @@ export class RenamingProvider implements RefactoringOperation {
     description = 'Rename variables, functions, classes, or files across the codebase';
 
     async canApply(context: RefactoringContext): Promise<boolean> {
-        // Check if current position is on a symbol
         const document = context.document;
         const position = context.selection.active;
 
@@ -50,7 +49,7 @@ export class RenamingProvider implements RefactoringOperation {
         // Handle special cases for cross-language renaming
         if (context.language === 'java') {
             await this.handleJavaRenaming(context, newName, workspaceEdit);
-        } else if (context.language === 'cpp') {
+        } else if (context.language === 'cpp' || context.language === 'c') {
             await this.handleCppRenaming(context, newName, workspaceEdit);
         }
 
@@ -64,8 +63,6 @@ export class RenamingProvider implements RefactoringOperation {
         for (const ref of references) {
             const document = await vscode.workspace.openTextDocument(ref.uri);
             const oldContent = document.getText();
-
-            // FIX: Get the actual text from the range instead of using character position
             const oldText = document.getText(ref.range);
             const newContent = oldContent.replace(
                 new RegExp(`\\b${this.escapeRegex(oldText)}\\b`, 'g'),
@@ -99,7 +96,6 @@ export class RenamingProvider implements RefactoringOperation {
         return references || [];
     }
 
-    // FIX: Added missing handleJavaRenaming method
     private async handleJavaRenaming(
         context: RefactoringContext,
         newName: string,
@@ -108,7 +104,6 @@ export class RenamingProvider implements RefactoringOperation {
         const document = context.document;
         const position = context.selection.active;
 
-        // Check if renaming a class or method
         const symbols = await vscode.commands.executeCommand<vscode.DocumentSymbol[]>(
             'vscode.executeDocumentSymbolProvider',
             document.uri
@@ -117,7 +112,6 @@ export class RenamingProvider implements RefactoringOperation {
         const symbol = this.findSymbolAtPosition(symbols || [], position);
         if (symbol) {
             if (symbol.kind === vscode.SymbolKind.Class) {
-                // Handle class renaming - need to rename file too
                 const currentFileName = path.basename(document.uri.fsPath, '.java');
                 if (currentFileName === symbol.name) {
                     const newFilePath = path.join(
@@ -128,20 +122,16 @@ export class RenamingProvider implements RefactoringOperation {
                     workspaceEdit.renameFile(document.uri, vscode.Uri.file(newFilePath));
                 }
 
-                // Handle JNI class renaming in C/C++ files
                 await this.handleJniClassRenaming(context, symbol.name, newName, workspaceEdit);
             } else if (symbol.kind === vscode.SymbolKind.Method) {
-                // Check if this is a native method
                 const methodText = document.getText(symbol.range);
                 if (methodText.includes('native')) {
-                    // Handle JNI method renaming in C/C++ files
                     await this.handleJniMethodRenaming(context, symbol.name, newName, workspaceEdit);
                 }
             }
         }
     }
 
-    // Handle JNI class renaming in C/C++ files
     private async handleJniClassRenaming(
         context: RefactoringContext,
         oldClassName: string,
@@ -150,7 +140,6 @@ export class RenamingProvider implements RefactoringOperation {
     ): Promise<void> {
         console.log(`🔄 Updating JNI class signatures: ${oldClassName} -> ${newClassName}`);
 
-        // Find corresponding C++ files in the workspace
         const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
         console.log(`📁 Found ${cppFiles.length} C++ files:`, cppFiles.map(f => f.fsPath));
 
@@ -158,7 +147,6 @@ export class RenamingProvider implements RefactoringOperation {
             const document = await vscode.workspace.openTextDocument(cppFile);
             const content = document.getText();
 
-            // Look for JNI function signatures that match the old class name
             const packageName = this.extractPackageName(context.document);
             console.log(`📦 Package name extracted: ${packageName}`);
 
@@ -168,7 +156,6 @@ export class RenamingProvider implements RefactoringOperation {
                 console.log(`🔧 JNI class signature update: ${oldJniPrefix} -> ${newJniPrefix}`);
 
                 if (oldJniPrefix && newJniPrefix) {
-                    // Find and replace JNI class signatures with precise targeting
                     const edits = this.findAndReplaceJniClassFunctions(document, oldJniPrefix, newJniPrefix);
 
                     if (edits.length > 0) {
@@ -184,7 +171,6 @@ export class RenamingProvider implements RefactoringOperation {
         }
     }
 
-    // Handle JNI method renaming in C/C++ files
     private async handleJniMethodRenaming(
         context: RefactoringContext,
         oldMethodName: string,
@@ -193,11 +179,9 @@ export class RenamingProvider implements RefactoringOperation {
     ): Promise<void> {
         console.log(`🔄 Updating JNI method signatures: ${oldMethodName} -> ${newMethodName}`);
 
-        // Find corresponding C++ files in the workspace
         const cppFiles = await vscode.workspace.findFiles('**/*.{cpp,cc,cxx,c,h,hpp}');
         console.log(`📁 Found ${cppFiles.length} C++ files:`, cppFiles.map(f => f.fsPath));
 
-        // Extract class name from the Java file
         const className = this.extractClassName(context.document);
         const packageName = this.extractPackageName(context.document);
 
@@ -210,14 +194,12 @@ export class RenamingProvider implements RefactoringOperation {
             const document = await vscode.workspace.openTextDocument(cppFile);
             const content = document.getText();
 
-            // Create JNI function signature pattern
             const jniClassPrefix = this.createJniClassPrefix(packageName, className);
             if (jniClassPrefix) {
                 const oldJniFunction = `${jniClassPrefix}_${oldMethodName}`;
                 const newJniFunction = `${jniClassPrefix}_${newMethodName}`;
                 console.log(`🔧 JNI method signature update: ${oldJniFunction} -> ${newJniFunction}`);
 
-                // Find and replace specific JNI function occurrences with precise targeting
                 const edits = this.findAndReplaceJniFunction(document, oldJniFunction, newJniFunction);
 
                 if (edits.length > 0) {
@@ -232,32 +214,74 @@ export class RenamingProvider implements RefactoringOperation {
         }
     }
 
+    // FIX: Rewritten to search C++ files for JNI patterns when renaming in C++ context
     private async handleCppRenaming(
         context: RefactoringContext,
         newName: string,
         workspaceEdit: vscode.WorkspaceEdit
     ): Promise<void> {
-        // Handle C++ specific renaming logic
+        console.log(`🔄 Handling C++ renaming: ${newName}`);
+
+        // Find all Java files to check for corresponding native method declarations
+        const javaFiles = await vscode.workspace.findFiles('**/*.java');
+        console.log(`📁 Found ${javaFiles.length} Java files`);
+
+        for (const javaFile of javaFiles) {
+            const document = await vscode.workspace.openTextDocument(javaFile);
+            const content = document.getText();
+
+            // Look for native method declarations that might match the C++ function being renamed
+            const nativeMethodRegex = /^\s*(?:(?:public|private|protected|static|final|abstract|synchronized)\s+)*\w+\s+native\s+\w+\s+(\w+)\s*\([^)]*\)\s*;/gm;
+            let match;
+
+            while ((match = nativeMethodRegex.exec(content)) !== null) {
+                const nativeMethodName = match[1];
+                
+                // Check if this native method name matches or is related to the new name
+                // This helps when renaming the C++ function that implements a Java native method
+                if (nativeMethodName === newName || this.isRelatedName(nativeMethodName, newName)) {
+                    console.log(`🔍 Found potential native method match: ${nativeMethodName} in ${javaFile.fsPath}`);
+                    
+                    // The Java native method will be handled by the reference provider
+                    // This is mainly for logging and potential future enhancements
+                }
+            }
+        }
+
+        // Also handle JNI function signature patterns in the current C++ file
         const document = context.document;
         const content = document.getText();
 
-        // Check for JNI function signatures
-        const jniRegex = /JNIEXPORT\s+\w+\s+JNICALL\s+Java_[\w_]+_(\w+)/g;
-        let match;
+        // Check for JNI function signatures in the current C++ document
+        const jniRegex = /JNIEXPORT\s+\w+\s+JNICALL\s+(Java_[\w_]+)_(\w+)/g;
+        let jniMatch;
 
-        while ((match = jniRegex.exec(content)) !== null) {
-            const oldFunctionName = match[1];
-            const fullMatch = match[0];
+        while ((jniMatch = jniRegex.exec(content)) !== null) {
+            const jniClassPart = jniMatch[1];
+            const jniMethodPart = jniMatch[2];
+            const fullMatch = jniMatch[0];
 
-            // Replace JNI function name
-            const newJniName = fullMatch.replace(oldFunctionName, newName);
-            const range = new vscode.Range(
-                document.positionAt(match.index),
-                document.positionAt(match.index + fullMatch.length)
-            );
+            console.log(`🔍 Found JNI function: Java_${jniClassPart}_${jniMethodPart}`);
+            
+            // If the method part matches what we're renaming, update the full signature
+            if (jniMethodPart === context.symbolName || this.isRelatedName(jniMethodPart, context.symbolName || '')) {
+                const newJniName = fullMatch.replace(jniMethodPart, newName);
+                const range = new vscode.Range(
+                    document.positionAt(jniMatch.index),
+                    document.positionAt(jniMatch.index + fullMatch.length)
+                );
 
-            workspaceEdit.replace(document.uri, range, newJniName);
+                workspaceEdit.replace(document.uri, range, newJniName);
+                console.log(`✅ Updated JNI signature to: ${newJniName}`);
+            }
         }
+    }
+
+    // Helper to check if two names might be related (e.g., camelCase vs snake_case)
+    private isRelatedName(name1: string, name2: string): boolean {
+        // Simple heuristic: check if one contains the other (case-insensitive)
+        return name1.toLowerCase().includes(name2.toLowerCase()) || 
+               name2.toLowerCase().includes(name1.toLowerCase());
     }
 
     private extractPackageName(document: vscode.TextDocument): string {
@@ -277,12 +301,10 @@ export class RenamingProvider implements RefactoringOperation {
 
     private extractClassName(document: vscode.TextDocument): string | null {
         const content = document.getText();
-        // Match class declaration at start of line (prevents matching within comments)
         const classMatch = content.match(/^\s*(?:(?:public|private|protected|abstract|final|static)\s+)*\bclass\s+(\w+)/m);
         return classMatch ? classMatch[1] : null;
     }
 
-    // Helper method to find and replace JNI function signatures with precise targeting
     private findAndReplaceJniFunction(
         document: vscode.TextDocument,
         oldJniFunction: string,
@@ -291,17 +313,9 @@ export class RenamingProvider implements RefactoringOperation {
         const content = document.getText();
         const edits: Array<{ range: vscode.Range, newText: string }> = [];
 
-        // Look for JNI function signatures in various contexts:
-        // 1. JNIEXPORT ... JNICALL Java_package_Class_method
-        // 2. Function definitions: Java_package_Class_method(...)
-        // 3. Function declarations in headers
-
         const patterns = [
-            // JNIEXPORT return_type JNICALL Java_package_Class_method
             new RegExp(`(JNIEXPORT\s+\w+\s+JNICALL\s+)${this.escapeRegex(oldJniFunction)}\\b`, 'g'),
-            // Function definition: Java_package_Class_method(...)
             new RegExp(`\\b${this.escapeRegex(oldJniFunction)}(?=\\s*\\()`, 'g'),
-            // Function declaration in header
             new RegExp(`\\b${this.escapeRegex(oldJniFunction)}(?=\\s*;)`, 'g')
         ];
 
@@ -326,7 +340,6 @@ export class RenamingProvider implements RefactoringOperation {
         return edits;
     }
 
-    // Helper method to find and replace JNI class function signatures
     private findAndReplaceJniClassFunctions(
         document: vscode.TextDocument,
         oldJniPrefix: string,
@@ -335,13 +348,9 @@ export class RenamingProvider implements RefactoringOperation {
         const content = document.getText();
         const edits: Array<{ range: vscode.Range, newText: string }> = [];
 
-        // Look for JNI class function patterns: Java_package_OldClass_methodName
         const patterns = [
-            // JNIEXPORT return_type JNICALL Java_package_Class_method
             new RegExp(`(JNIEXPORT\s+\w+\s+JNICALL\s+)${this.escapeRegex(oldJniPrefix)}_([a-zA-Z_][a-zA-Z0-9_]*)\\b`, 'g'),
-            // Function definition: Java_package_Class_method(...)
             new RegExp(`\\b${this.escapeRegex(oldJniPrefix)}_([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*\\()`, 'g'),
-            // Function declaration in header
             new RegExp(`\\b${this.escapeRegex(oldJniPrefix)}_([a-zA-Z_][a-zA-Z0-9_]*)(?=\\s*;)`, 'g')
         ];
 
@@ -350,7 +359,6 @@ export class RenamingProvider implements RefactoringOperation {
             while ((match = pattern.exec(content)) !== null) {
                 const prefixStart = match.index + (match[1] ? match[1].length : 0);
                 const prefixEnd = prefixStart + oldJniPrefix.length;
-                const methodName = match[match.length - 1]; // Last capture group is the method name
 
                 const range = new vscode.Range(
                     document.positionAt(prefixStart),
@@ -370,13 +378,11 @@ export class RenamingProvider implements RefactoringOperation {
     private findSymbolAtPosition(symbols: vscode.DocumentSymbol[], position: vscode.Position): vscode.DocumentSymbol | null {
         for (const symbol of symbols) {
             if (symbol.range.contains(position)) {
-                // Check children first
                 const childSymbol = this.findSymbolAtPosition(symbol.children, position);
                 if (childSymbol) {
                     return childSymbol;
                 }
 
-                // Check if position is on the symbol name
                 if (symbol.selectionRange.contains(position)) {
                     return symbol;
                 }
@@ -390,7 +396,6 @@ export class RenamingProvider implements RefactoringOperation {
     }
 
     private generateDiff(oldContent: string, newContent: string): string {
-        // Simple diff implementation
         return `--- Old\n+++ New\n@@ -1,${oldContent.split('\n').length} +1,${newContent.split('\n').length} @@\n`;
     }
 }
